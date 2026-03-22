@@ -19,20 +19,48 @@
 namespace spikeviewer {
 namespace {
 
+constexpr double kPi = 3.14159265358979323846;
+
 struct HeaderInfo {
     QString version;
     double sampleRate = 0.0;
 };
 
+struct DigitalChannelDescriptor {
+    QString path;
+    int bitIndex = 0;
+    QString label;
+};
+
 struct DataConfig {
     int channelCount = 0;
-    QString timePath;
+    QString masterPath;
+    QString masterFormat;
+    QVector<DigitalChannelDescriptor> digitalChannels;
 };
 
 struct SettingsInfo {
     double sampleRate = 0.0;
     QVector<QString> labels;
 };
+
+struct BiquadCoefficients {
+    double b0 = 1.0;
+    double b1 = 0.0;
+    double b2 = 0.0;
+    double a1 = 0.0;
+    double a2 = 0.0;
+    bool valid = false;
+};
+
+void appendCandidate(QVector<int>* candidates, int value) {
+    if (candidates == nullptr || value <= 0) {
+        return;
+    }
+    if (!candidates->contains(value)) {
+        candidates->push_back(value);
+    }
+}
 
 QString findFirst(const QString& baseDir, const QStringList& patterns) {
     QDir dir(baseDir);
@@ -57,6 +85,32 @@ float medianCopy(std::vector<float> values) {
     }
     std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(mid - 1), values.begin() + static_cast<std::ptrdiff_t>(mid));
     return 0.5f * (upper + values[mid - 1]);
+}
+
+int bytesPerSampleForFormat(const QString& format) {
+    const QString normalized = format.trimmed().toLower();
+    if (normalized == QStringLiteral("int16")
+        || normalized == QStringLiteral("uint16")
+        || normalized == QStringLiteral("uint16_length")
+        || normalized == QStringLiteral("int16_length")) {
+        return 2;
+    }
+    if (normalized == QStringLiteral("int32")
+        || normalized == QStringLiteral("uint32")
+        || normalized == QStringLiteral("int32_length")
+        || normalized == QStringLiteral("uint32_length")) {
+        return 4;
+    }
+    return 0;
+}
+
+QString normalizeDigitalLabel(const QString& name, int bitIndex) {
+    QString label = QStringLiteral("DIGITAL IN %1").arg(bitIndex);
+    const QString trimmed = name.trimmed();
+    if (!trimmed.isEmpty() && trimmed.compare(QStringLiteral("master"), Qt::CaseInsensitive) != 0) {
+        label += QStringLiteral(" | %1").arg(trimmed);
+    }
+    return label;
 }
 
 HeaderInfo parseIntanHeader(const QString& path, QString* error) {
@@ -118,16 +172,58 @@ DataConfig parseDataConfig(const QString& baseDir) {
         if (!value.isObject()) {
             continue;
         }
+
         const QJsonObject object = value.toObject();
-        if (object.value(QStringLiteral("filepath")).toString() == QStringLiteral("amplifier.dat")) {
+        const QString relativePath = object.value(QStringLiteral("filepath")).toString();
+        const QString absolutePath = relativePath.isEmpty() ? QString() : dir.absoluteFilePath(relativePath);
+        const QString dataType = object.value(QStringLiteral("data_type")).toString();
+        const QString name = object.value(QStringLiteral("name")).toString();
+        const QString format = object.value(QStringLiteral("format")).toString();
+
+        if (QFileInfo(relativePath).fileName() == QStringLiteral("amplifier.dat")) {
             config.channelCount = object.value(QStringLiteral("channel_count")).toInt(config.channelCount);
+            continue;
         }
-        if (object.value(QStringLiteral("name")).toString() == QStringLiteral("master")) {
-            const QString timeFile = object.value(QStringLiteral("filepath")).toString();
-            if (!timeFile.isEmpty()) {
-                config.timePath = dir.absoluteFilePath(timeFile);
+
+        if (name.compare(QStringLiteral("master"), Qt::CaseInsensitive) == 0 && !absolutePath.isEmpty()) {
+            config.masterPath = absolutePath;
+            config.masterFormat = format;
+            continue;
+        }
+
+        if (!object.contains(QStringLiteral("channel"))) {
+            continue;
+        }
+
+        bool okChannel = false;
+        const int bitIndex = object.value(QStringLiteral("channel")).toVariant().toInt(&okChannel);
+        if (!okChannel || bitIndex < 0 || absolutePath.isEmpty()) {
+            continue;
+        }
+
+        const bool looksDigital = dataType.startsWith(QStringLiteral("digital"), Qt::CaseInsensitive)
+            || absolutePath.contains(QStringLiteral("digital"), Qt::CaseInsensitive)
+            || format.startsWith(QStringLiteral("uint16"), Qt::CaseInsensitive);
+        if (!looksDigital) {
+            continue;
+        }
+
+        bool duplicate = false;
+        for (const DigitalChannelDescriptor& descriptor : config.digitalChannels) {
+            if (descriptor.path == absolutePath && descriptor.bitIndex == bitIndex) {
+                duplicate = true;
+                break;
             }
         }
+        if (duplicate) {
+            continue;
+        }
+
+        DigitalChannelDescriptor descriptor;
+        descriptor.path = absolutePath;
+        descriptor.bitIndex = bitIndex;
+        descriptor.label = normalizeDigitalLabel(name, bitIndex);
+        config.digitalChannels.push_back(descriptor);
     }
 
     return config;
@@ -187,6 +283,7 @@ QVector<ChannelInfo> parseElectrodeCfg(const QString& path, int channelCount, co
         info.electrodeId = index + 1;
         info.x = static_cast<float>(index);
         info.y = 0.0f;
+        info.sourceKind = ChannelInfo::SourceKind::Amplifier;
         channels[index] = info;
     }
 
@@ -222,7 +319,6 @@ QVector<ChannelInfo> parseElectrodeCfg(const QString& path, int channelCount, co
         const int channelNumber = parts[1].toInt(&okChannel);
         const float x = parts[2].toFloat(&okX);
         const float y = parts[3].toFloat(&okY);
-
         if (!okElectrode || !okChannel || !okX || !okY) {
             continue;
         }
@@ -238,6 +334,251 @@ QVector<ChannelInfo> parseElectrodeCfg(const QString& path, int channelCount, co
     }
 
     return channels;
+}
+
+int inferElectrodeChannelCount(const QString& path) {
+    QFile file(path);
+    if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return 0;
+    }
+
+    QTextStream stream(&file);
+    bool firstLine = true;
+    int maxChannelNumber = 0;
+    while (!stream.atEnd()) {
+        const QString rawLine = stream.readLine().trimmed();
+        if (rawLine.isEmpty()) {
+            continue;
+        }
+        if (firstLine) {
+            firstLine = false;
+            continue;
+        }
+
+        const QString normalized = QString(rawLine).replace(',', ' ');
+        const QStringList parts = normalized.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        if (parts.size() < 2) {
+            continue;
+        }
+
+        bool okChannel = false;
+        const int channelNumber = parts[1].toInt(&okChannel);
+        if (okChannel) {
+            maxChannelNumber = std::max(maxChannelNumber, channelNumber);
+        }
+    }
+
+    return maxChannelNumber;
+}
+
+int inferChannelCount(
+    const QString& amplifierPath,
+    const QString& masterPath,
+    int masterBytesPerSample,
+    const DataConfig& config,
+    const SettingsInfo& settings,
+    const QString& electrodeCfgPath,
+    QString* error) {
+    const QFileInfo amplifierInfo(amplifierPath);
+    const qint64 amplifierBytes = amplifierInfo.size();
+    if (amplifierBytes <= 0 || (amplifierBytes % static_cast<qint64>(sizeof(qint16))) != 0) {
+        if (error) {
+            *error = QStringLiteral("amplifier.dat has an invalid byte size.");
+        }
+        return 0;
+    }
+
+    const qint64 amplifierValueCount = amplifierBytes / static_cast<qint64>(sizeof(qint16));
+    const int electrodeChannelCount = inferElectrodeChannelCount(electrodeCfgPath);
+    int timeInferredChannelCount = 0;
+    if (!masterPath.isEmpty() && QFileInfo::exists(masterPath) && masterBytesPerSample > 0) {
+        const qint64 masterBytes = QFileInfo(masterPath).size();
+        if (masterBytes > 0 && (masterBytes % masterBytesPerSample) == 0) {
+            const qint64 masterSampleCount = masterBytes / masterBytesPerSample;
+            if (masterSampleCount > 0 && (amplifierValueCount % masterSampleCount) == 0) {
+                timeInferredChannelCount = static_cast<int>(amplifierValueCount / masterSampleCount);
+            }
+        }
+    }
+
+    QVector<int> candidates;
+    appendCandidate(&candidates, timeInferredChannelCount);
+    appendCandidate(&candidates, config.channelCount);
+    appendCandidate(&candidates, electrodeChannelCount);
+    appendCandidate(&candidates, settings.labels.size());
+    appendCandidate(&candidates, 32);
+
+    for (int candidate : candidates) {
+        if ((amplifierValueCount % candidate) == 0) {
+            return candidate;
+        }
+    }
+
+    if (error) {
+        QStringList parts;
+        if (timeInferredChannelCount > 0) {
+            parts.push_back(QStringLiteral("master=%1").arg(timeInferredChannelCount));
+        }
+        if (config.channelCount > 0) {
+            parts.push_back(QStringLiteral("data.json=%1").arg(config.channelCount));
+        }
+        if (electrodeChannelCount > 0) {
+            parts.push_back(QStringLiteral("electrode.cfg=%1").arg(electrodeChannelCount));
+        }
+        if (!settings.labels.isEmpty()) {
+            parts.push_back(QStringLiteral("settings.xml=%1").arg(settings.labels.size()));
+        }
+        *error = QStringLiteral(
+            "Could not infer a valid amplifier channel count. amplifier.dat contains %1 int16 values; candidates were [%2].")
+                     .arg(amplifierValueCount)
+                     .arg(parts.join(QStringLiteral(", ")));
+    }
+    return 0;
+}
+
+double clampCutoff(double sampleRate, double cutoff) {
+    return std::clamp(cutoff, 1.0, sampleRate * 0.45);
+}
+
+BiquadCoefficients makeLowpass(double sampleRate, double cutoffHz) {
+    BiquadCoefficients coefficients;
+    if (sampleRate <= 0.0) {
+        return coefficients;
+    }
+
+    const double cutoff = clampCutoff(sampleRate, cutoffHz);
+    const double q = std::sqrt(0.5);
+    const double omega = 2.0 * kPi * cutoff / sampleRate;
+    const double sinOmega = std::sin(omega);
+    const double cosOmega = std::cos(omega);
+    const double alpha = sinOmega / (2.0 * q);
+    const double a0 = 1.0 + alpha;
+    if (std::abs(a0) < 1.0e-12) {
+        return coefficients;
+    }
+
+    coefficients.b0 = ((1.0 - cosOmega) * 0.5) / a0;
+    coefficients.b1 = (1.0 - cosOmega) / a0;
+    coefficients.b2 = ((1.0 - cosOmega) * 0.5) / a0;
+    coefficients.a1 = (-2.0 * cosOmega) / a0;
+    coefficients.a2 = (1.0 - alpha) / a0;
+    coefficients.valid = true;
+    return coefficients;
+}
+
+BiquadCoefficients makeHighpass(double sampleRate, double cutoffHz) {
+    BiquadCoefficients coefficients;
+    if (sampleRate <= 0.0) {
+        return coefficients;
+    }
+
+    const double cutoff = clampCutoff(sampleRate, cutoffHz);
+    const double q = std::sqrt(0.5);
+    const double omega = 2.0 * kPi * cutoff / sampleRate;
+    const double sinOmega = std::sin(omega);
+    const double cosOmega = std::cos(omega);
+    const double alpha = sinOmega / (2.0 * q);
+    const double a0 = 1.0 + alpha;
+    if (std::abs(a0) < 1.0e-12) {
+        return coefficients;
+    }
+
+    coefficients.b0 = ((1.0 + cosOmega) * 0.5) / a0;
+    coefficients.b1 = (-(1.0 + cosOmega)) / a0;
+    coefficients.b2 = ((1.0 + cosOmega) * 0.5) / a0;
+    coefficients.a1 = (-2.0 * cosOmega) / a0;
+    coefficients.a2 = (1.0 - alpha) / a0;
+    coefficients.valid = true;
+    return coefficients;
+}
+
+BiquadCoefficients makeNotch(double sampleRate, double centerHz, double q) {
+    BiquadCoefficients coefficients;
+    if (sampleRate <= 0.0) {
+        return coefficients;
+    }
+
+    const double cutoff = clampCutoff(sampleRate, centerHz);
+    const double omega = 2.0 * kPi * cutoff / sampleRate;
+    const double sinOmega = std::sin(omega);
+    const double cosOmega = std::cos(omega);
+    const double alpha = sinOmega / (2.0 * q);
+    const double a0 = 1.0 + alpha;
+    if (std::abs(a0) < 1.0e-12) {
+        return coefficients;
+    }
+
+    coefficients.b0 = 1.0 / a0;
+    coefficients.b1 = (-2.0 * cosOmega) / a0;
+    coefficients.b2 = 1.0 / a0;
+    coefficients.a1 = (-2.0 * cosOmega) / a0;
+    coefficients.a2 = (1.0 - alpha) / a0;
+    coefficients.valid = true;
+    return coefficients;
+}
+
+void processBiquad(QVector<float>* samples, const BiquadCoefficients& coefficients) {
+    if (samples == nullptr || !coefficients.valid || samples->isEmpty()) {
+        return;
+    }
+
+    double z1 = 0.0;
+    double z2 = 0.0;
+    for (float& sample : *samples) {
+        const double x = static_cast<double>(sample);
+        const double y = (coefficients.b0 * x) + z1;
+        z1 = (coefficients.b1 * x) - (coefficients.a1 * y) + z2;
+        z2 = (coefficients.b2 * x) - (coefficients.a2 * y);
+        sample = static_cast<float>(y);
+    }
+}
+
+void applyZeroPhaseBiquad(QVector<float>* samples, const BiquadCoefficients& coefficients) {
+    if (samples == nullptr || samples->size() < 3 || !coefficients.valid) {
+        return;
+    }
+    processBiquad(samples, coefficients);
+    std::reverse(samples->begin(), samples->end());
+    processBiquad(samples, coefficients);
+    std::reverse(samples->begin(), samples->end());
+}
+
+int recommendedPaddingSamples(double sampleRate, TransformMode mode) {
+    if (mode == TransformMode::Raw) {
+        return 0;
+    }
+    if (sampleRate <= 0.0) {
+        return 256;
+    }
+    return std::clamp(static_cast<int>(std::llround(sampleRate * 0.02)), 128, 4096);
+}
+
+void applyTransformInPlace(QVector<float>* samples, double sampleRate, TransformMode mode) {
+    if (samples == nullptr || samples->isEmpty() || mode == TransformMode::Raw) {
+        return;
+    }
+
+    switch (mode) {
+    case TransformMode::Raw:
+        return;
+    case TransformMode::Highpass300:
+        applyZeroPhaseBiquad(samples, makeHighpass(sampleRate, 300.0));
+        return;
+    case TransformMode::Bandpass300To6000:
+        applyZeroPhaseBiquad(samples, makeHighpass(sampleRate, 300.0));
+        applyZeroPhaseBiquad(samples, makeLowpass(sampleRate, std::min(6000.0, sampleRate * 0.45)));
+        return;
+    case TransformMode::Bandpass500To3000:
+        applyZeroPhaseBiquad(samples, makeHighpass(sampleRate, 500.0));
+        applyZeroPhaseBiquad(samples, makeLowpass(sampleRate, std::min(3000.0, sampleRate * 0.45)));
+        return;
+    case TransformMode::Lowpass250:
+        applyZeroPhaseBiquad(samples, makeLowpass(sampleRate, 250.0));
+        return;
+    case TransformMode::Notch60:
+        applyZeroPhaseBiquad(samples, makeNotch(sampleRate, 60.0, 30.0));
+        return;
+    }
 }
 
 }  // namespace
@@ -271,7 +612,7 @@ bool MappedInt16Matrix::open(const QString& path, int channelCount, QString* err
     }
     if (channelCount <= 0) {
         if (error) {
-            *error = QStringLiteral("Detected channel count is invalid.");
+            *error = QStringLiteral("Detected amplifier channel count is invalid.");
         }
         return false;
     }
@@ -317,8 +658,64 @@ const qint16* MappedInt16Matrix::row(int sampleIndex) const {
     return reinterpret_cast<const qint16*>(mapped_) + (static_cast<qint64>(sampleIndex) * channelCount_);
 }
 
+MappedUInt16Vector::~MappedUInt16Vector() {
+    if (mapped_ != nullptr) {
+        file_.unmap(mapped_);
+    }
+}
+
+bool MappedUInt16Vector::open(const QString& path, QString* error) {
+    if (mapped_ != nullptr) {
+        file_.unmap(mapped_);
+        mapped_ = nullptr;
+    }
+
+    file_.setFileName(path);
+    if (!file_.open(QIODevice::ReadOnly)) {
+        if (error) {
+            *error = QStringLiteral("Could not open %1.").arg(QFileInfo(path).fileName());
+        }
+        return false;
+    }
+
+    byteCount_ = file_.size();
+    if (byteCount_ <= 0 || (byteCount_ % static_cast<qint64>(sizeof(quint16))) != 0) {
+        if (error) {
+            *error = QStringLiteral("%1 has an invalid byte size.").arg(QFileInfo(path).fileName());
+        }
+        return false;
+    }
+
+    mapped_ = file_.map(0, byteCount_);
+    if (mapped_ == nullptr) {
+        if (error) {
+            *error = QStringLiteral("Could not memory-map %1.").arg(QFileInfo(path).fileName());
+        }
+        return false;
+    }
+
+    sampleCount_ = static_cast<int>(byteCount_ / static_cast<qint64>(sizeof(quint16)));
+    return true;
+}
+
+bool MappedUInt16Vector::isOpen() const {
+    return mapped_ != nullptr;
+}
+
+int MappedUInt16Vector::sampleCount() const {
+    return sampleCount_;
+}
+
+quint16 MappedUInt16Vector::sampleValue(int sampleIndex) const {
+    return reinterpret_cast<const quint16*>(mapped_)[sampleIndex];
+}
+
 bool HeatmapResult::isValid() const {
     return rows > 0 && cols > 0 && times.size() == cols;
+}
+
+bool isDigitalChannel(const ChannelInfo& channel) {
+    return channel.sourceKind == ChannelInfo::SourceKind::DigitalBit;
 }
 
 std::shared_ptr<RecordingData> loadRecording(const QString& infoPath, QString* error) {
@@ -342,8 +739,13 @@ std::shared_ptr<RecordingData> loadRecording(const QString& infoPath, QString* e
     const QString baseDir = infoFile.absolutePath();
     const DataConfig config = parseDataConfig(baseDir);
     const SettingsInfo settings = parseSettingsXml(QDir(baseDir).absoluteFilePath(QStringLiteral("settings.xml")));
-
+    const QString masterPath = !config.masterPath.isEmpty() ? config.masterPath : findFirst(baseDir, {QStringLiteral("time.dat")});
+    const int masterBytesPerSample = !config.masterFormat.isEmpty()
+        ? bytesPerSampleForFormat(config.masterFormat)
+        : (QFileInfo(masterPath).fileName() == QStringLiteral("time.dat") ? 4 : 2);
+    const QString electrodeCfgPath = QDir(baseDir).absoluteFilePath(QStringLiteral("electrode.cfg"));
     const QString amplifierPath = QDir(baseDir).absoluteFilePath(QStringLiteral("amplifier.dat"));
+
     if (!QFileInfo::exists(amplifierPath)) {
         if (error) {
             *error = QStringLiteral("amplifier.dat was not found next to info.rhd.");
@@ -351,7 +753,15 @@ std::shared_ptr<RecordingData> loadRecording(const QString& infoPath, QString* e
         return {};
     }
 
-    const int channelCount = std::max(config.channelCount, std::max(settings.labels.size(), 32));
+    QString channelError;
+    const int channelCount = inferChannelCount(amplifierPath, masterPath, masterBytesPerSample, config, settings, electrodeCfgPath, &channelError);
+    if (channelCount <= 0) {
+        if (error) {
+            *error = channelError;
+        }
+        return {};
+    }
+
     const double sampleRate = settings.sampleRate > 0.0 ? settings.sampleRate : header.sampleRate;
     if (sampleRate <= 0.0) {
         if (error) {
@@ -361,81 +771,191 @@ std::shared_ptr<RecordingData> loadRecording(const QString& infoPath, QString* e
     }
 
     auto amplifier = std::make_shared<MappedInt16Matrix>();
-    QString mapError;
-    if (!amplifier->open(amplifierPath, channelCount, &mapError)) {
+    QString amplifierError;
+    if (!amplifier->open(amplifierPath, channelCount, &amplifierError)) {
         if (error) {
-            *error = mapError;
+            *error = amplifierError;
         }
         return {};
+    }
+
+    std::shared_ptr<MappedUInt16Vector> digitalIn;
+    QString digitalPath;
+    if (!config.digitalChannels.isEmpty()) {
+        digitalPath = config.digitalChannels.first().path;
+        if (QFileInfo::exists(digitalPath)) {
+            digitalIn = std::make_shared<MappedUInt16Vector>();
+            QString digitalError;
+            if (!digitalIn->open(digitalPath, &digitalError)) {
+                if (error) {
+                    *error = digitalError;
+                }
+                return {};
+            }
+        }
     }
 
     auto recording = std::make_shared<RecordingData>();
     recording->baseDir = baseDir;
     recording->infoPath = infoPath;
     recording->amplifierPath = amplifierPath;
-    recording->timePath = !config.timePath.isEmpty() ? config.timePath : findFirst(baseDir, {QStringLiteral("time.dat")});
+    recording->digitalInPath = digitalPath;
+    recording->timePath = masterPath;
     recording->sampleRate = sampleRate;
     recording->sampleCount = amplifier->sampleCount();
     recording->durationSeconds = static_cast<double>(recording->sampleCount) / sampleRate;
     recording->channelCount = channelCount;
-    recording->channels = parseElectrodeCfg(QDir(baseDir).absoluteFilePath(QStringLiteral("electrode.cfg")), channelCount, settings.labels);
+    recording->channels = parseElectrodeCfg(electrodeCfgPath, channelCount, settings.labels);
     recording->amplifier = amplifier;
+    recording->digitalIn = digitalIn;
+
+    if (digitalIn && digitalIn->isOpen()) {
+        int auxIndex = 0;
+        for (const DigitalChannelDescriptor& descriptor : config.digitalChannels) {
+            if (descriptor.path != digitalPath) {
+                continue;
+            }
+
+            ChannelInfo channel;
+            channel.index = descriptor.bitIndex;
+            channel.label = descriptor.label;
+            channel.electrodeId = descriptor.bitIndex;
+            channel.x = static_cast<float>(auxIndex);
+            channel.y = 0.0f;
+            channel.sourceKind = ChannelInfo::SourceKind::DigitalBit;
+            recording->channels.push_back(channel);
+            ++auxIndex;
+        }
+    }
+
     return recording;
 }
 
-QVector<float> estimateEventThresholds(const RecordingData& recording, int windowSamples, int sampleWindows) {
-    QVector<float> thresholds(recording.channelCount, -20.0f);
-    if (recording.sampleCount <= 0 || !recording.amplifier || !recording.amplifier->isOpen()) {
+QVector<float> extractChannelWindow(
+    const RecordingData& recording,
+    const ChannelInfo& channel,
+    int startSample,
+    int endSample,
+    TransformMode transformMode,
+    int paddingSamples) {
+    QVector<float> output;
+    const int start = std::clamp(startSample, 0, recording.sampleCount);
+    const int end = std::clamp(endSample, start, recording.sampleCount);
+    if (end <= start) {
+        return output;
+    }
+
+    if (isDigitalChannel(channel)) {
+        output.fill(0.0f, end - start);
+        if (!recording.digitalIn || !recording.digitalIn->isOpen()) {
+            return output;
+        }
+        const int digitalEnd = std::min(end, recording.digitalIn->sampleCount());
+        for (int sampleIndex = start; sampleIndex < digitalEnd; ++sampleIndex) {
+            const quint16 rawValue = recording.digitalIn->sampleValue(sampleIndex);
+            output[sampleIndex - start] = ((rawValue >> channel.index) & 0x1u) ? 1.0f : 0.0f;
+        }
+        return output;
+    }
+
+    if (!recording.amplifier || !recording.amplifier->isOpen()) {
+        return output;
+    }
+
+    if (paddingSamples < 0) {
+        paddingSamples = recommendedPaddingSamples(recording.sampleRate, transformMode);
+    }
+    paddingSamples = std::max(paddingSamples, 0);
+
+    const int paddedStart = std::max(start - paddingSamples, 0);
+    const int paddedEnd = std::min(end + paddingSamples, recording.sampleCount);
+    QVector<float> samples(paddedEnd - paddedStart);
+    for (int sampleIndex = paddedStart; sampleIndex < paddedEnd; ++sampleIndex) {
+        samples[sampleIndex - paddedStart] = recording.amplifier->sampleUv(sampleIndex, channel.index);
+    }
+
+    applyTransformInPlace(&samples, recording.sampleRate, transformMode);
+    output = samples.mid(start - paddedStart, end - start);
+    return output;
+}
+
+QVector<float> estimateEventThresholds(
+    const RecordingData& recording,
+    const QVector<int>& displayChannelIndices,
+    TransformMode transformMode,
+    int windowSamples,
+    int sampleWindows) {
+    QVector<float> thresholds(displayChannelIndices.size(), -20.0f);
+    if (displayChannelIndices.isEmpty() || recording.sampleCount <= 0) {
         return thresholds;
     }
 
     windowSamples = std::max(256, std::min(windowSamples, recording.sampleCount));
     sampleWindows = std::max(1, sampleWindows);
-
     const int maxStart = std::max(recording.sampleCount - windowSamples, 0);
-    std::vector<std::vector<float>> sigmaPerChannel(static_cast<std::size_t>(recording.channelCount));
-    std::vector<float> scratch(static_cast<std::size_t>(windowSamples));
-    std::vector<float> centered(static_cast<std::size_t>(windowSamples));
+
+    std::vector<std::vector<float>> sigmaPerChannel(static_cast<std::size_t>(displayChannelIndices.size()));
+    for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+        if (isDigitalChannel(recording.channels[displayChannelIndices[displayRow]])) {
+            thresholds[displayRow] = 0.5f;
+        }
+    }
 
     for (int windowIndex = 0; windowIndex < sampleWindows; ++windowIndex) {
         const int start = (sampleWindows == 1)
             ? 0
             : static_cast<int>(std::llround((static_cast<double>(windowIndex) * maxStart) / (sampleWindows - 1)));
-        for (int channel = 0; channel < recording.channelCount; ++channel) {
-            for (int offset = 0; offset < windowSamples; ++offset) {
-                scratch[static_cast<std::size_t>(offset)] = recording.amplifier->sampleUv(start + offset, channel);
+        const int end = start + windowSamples;
+
+        for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+            const ChannelInfo& channel = recording.channels[displayChannelIndices[displayRow]];
+            if (isDigitalChannel(channel)) {
+                continue;
             }
+
+            QVector<float> signal = extractChannelWindow(recording, channel, start, end, transformMode);
+            if (signal.isEmpty()) {
+                continue;
+            }
+            std::vector<float> scratch(signal.begin(), signal.end());
             const float median = medianCopy(scratch);
-            for (int offset = 0; offset < windowSamples; ++offset) {
-                centered[static_cast<std::size_t>(offset)] = std::abs(scratch[static_cast<std::size_t>(offset)] - median);
+            for (float& value : scratch) {
+                value = std::abs(value - median);
             }
-            const float mad = medianCopy(centered);
-            sigmaPerChannel[static_cast<std::size_t>(channel)].push_back(mad / 0.6745f);
+            const float mad = medianCopy(scratch);
+            sigmaPerChannel[static_cast<std::size_t>(displayRow)].push_back(mad / 0.6745f);
         }
     }
 
-    for (int channel = 0; channel < recording.channelCount; ++channel) {
-        float sigma = medianCopy(sigmaPerChannel[static_cast<std::size_t>(channel)]);
+    for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+        const ChannelInfo& channel = recording.channels[displayChannelIndices[displayRow]];
+        if (isDigitalChannel(channel)) {
+            continue;
+        }
+        float sigma = medianCopy(sigmaPerChannel[static_cast<std::size_t>(displayRow)]);
         sigma = std::max(sigma, 2.5f);
-        thresholds[channel] = -4.0f * sigma;
+        thresholds[displayRow] = -4.0f * sigma;
     }
 
     return thresholds;
 }
 
-HeatmapResult computeHeatmap(const RecordingData& recording) {
+HeatmapResult computeHeatmap(
+    const RecordingData& recording,
+    const QVector<int>& displayChannelIndices,
+    TransformMode transformMode) {
     HeatmapResult result;
-    if (recording.sampleCount <= 0 || recording.channelCount <= 0 || !recording.amplifier || !recording.amplifier->isOpen()) {
+    if (displayChannelIndices.isEmpty() || recording.sampleCount <= 0) {
         return result;
     }
 
-    result.eventThresholds = estimateEventThresholds(recording);
+    result.eventThresholds = estimateEventThresholds(recording, displayChannelIndices, transformMode);
 
-    QVector<int> order(recording.channelCount);
+    QVector<int> order(displayChannelIndices.size());
     std::iota(order.begin(), order.end(), 0);
     std::sort(order.begin(), order.end(), [&](int left, int right) {
-        const ChannelInfo& a = recording.channels[left];
-        const ChannelInfo& b = recording.channels[right];
+        const ChannelInfo& a = recording.channels[displayChannelIndices[left]];
+        const ChannelInfo& b = recording.channels[displayChannelIndices[right]];
         if (a.y == b.y) {
             return a.x < b.x;
         }
@@ -448,7 +968,7 @@ HeatmapResult computeHeatmap(const RecordingData& recording) {
         edges[index] = static_cast<int>(std::llround((static_cast<double>(index) * recording.sampleCount) / binCount));
     }
 
-    result.rows = recording.channelCount;
+    result.rows = displayChannelIndices.size();
     result.cols = binCount;
     result.order = order;
     result.times.resize(binCount);
@@ -461,24 +981,18 @@ HeatmapResult computeHeatmap(const RecordingData& recording) {
     result.populationEvents.fill(0.0f, result.cols);
     result.commonModeSeries.fill(0.0f, result.cols);
 
-    QVector<float> xCoords(recording.channelCount);
-    QVector<float> yCoords(recording.channelCount);
-    for (int channel = 0; channel < recording.channelCount; ++channel) {
-        xCoords[channel] = recording.channels[channel].x;
-        yCoords[channel] = recording.channels[channel].y;
+    QVector<float> xCoords(displayChannelIndices.size());
+    QVector<float> yCoords(displayChannelIndices.size());
+    for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+        const ChannelInfo& channel = recording.channels[displayChannelIndices[displayRow]];
+        xCoords[displayRow] = channel.x;
+        yCoords[displayRow] = channel.y;
     }
 
-    std::vector<float> scratch;
-    QVector<float> medians(recording.channelCount);
-    QVector<double> sumAbs(recording.channelCount);
-    QVector<double> sumSq(recording.channelCount);
-    QVector<double> minCentered(recording.channelCount);
-    QVector<double> maxCentered(recording.channelCount);
-    QVector<float> previousCentered(recording.channelCount);
-    QVector<float> activity(recording.channelCount);
-    QVector<float> events(recording.channelCount);
-    QVector<float> rms(recording.channelCount);
-    QVector<float> ptp(recording.channelCount);
+    QVector<float> activity(displayChannelIndices.size());
+    QVector<float> events(displayChannelIndices.size());
+    QVector<float> rms(displayChannelIndices.size());
+    QVector<float> ptp(displayChannelIndices.size());
     QVector<float> xCenters(binCount);
     QVector<float> yCenters(binCount);
 
@@ -491,55 +1005,86 @@ HeatmapResult computeHeatmap(const RecordingData& recording) {
             continue;
         }
 
-        scratch.resize(static_cast<std::size_t>(length));
-        for (int channel = 0; channel < recording.channelCount; ++channel) {
-            for (int offset = 0; offset < length; ++offset) {
-                scratch[static_cast<std::size_t>(offset)] = recording.amplifier->sampleUv(start + offset, channel);
-            }
-            medians[channel] = medianCopy(scratch);
-        }
-
-        std::fill(sumAbs.begin(), sumAbs.end(), 0.0);
-        std::fill(sumSq.begin(), sumSq.end(), 0.0);
-        std::fill(minCentered.begin(), minCentered.end(), std::numeric_limits<double>::infinity());
-        std::fill(maxCentered.begin(), maxCentered.end(), -std::numeric_limits<double>::infinity());
-        std::fill(previousCentered.begin(), previousCentered.end(), 0.0f);
-        std::fill(activity.begin(), activity.end(), 0.0f);
-        std::fill(events.begin(), events.end(), 0.0f);
-        std::fill(rms.begin(), rms.end(), 0.0f);
-        std::fill(ptp.begin(), ptp.end(), 0.0f);
-
+        QVector<float> commonAccumulator(length, 0.0f);
         double commonModeSq = 0.0;
-        for (int sampleIndex = start; sampleIndex < end; ++sampleIndex) {
-            const qint16* row = recording.amplifier->row(sampleIndex);
-            double sampleMean = 0.0;
-            for (int channel = 0; channel < recording.channelCount; ++channel) {
-                const float raw = static_cast<float>(row[channel]) * kIntanUvPerBit;
-                const float centered = raw - medians[channel];
-                sumAbs[channel] += std::abs(raw);
-                sumSq[channel] += centered * centered;
-                minCentered[channel] = std::min(minCentered[channel], static_cast<double>(centered));
-                maxCentered[channel] = std::max(maxCentered[channel], static_cast<double>(centered));
-                if (sampleIndex > start && centered < result.eventThresholds[channel] && previousCentered[channel] >= result.eventThresholds[channel]) {
-                    events[channel] += 1.0f;
-                }
-                previousCentered[channel] = centered;
-                sampleMean += centered;
-            }
-            sampleMean /= recording.channelCount;
-            commonModeSq += sampleMean * sampleMean;
-        }
-
         float populationActivity = 0.0f;
         float populationEvents = 0.0f;
-        for (int channel = 0; channel < recording.channelCount; ++channel) {
-            activity[channel] = static_cast<float>(sumAbs[channel] / length);
-            rms[channel] = static_cast<float>(std::sqrt(sumSq[channel] / length));
-            ptp[channel] = static_cast<float>(maxCentered[channel] - minCentered[channel]);
-            populationActivity += activity[channel];
-            populationEvents += events[channel];
+
+        for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+            const ChannelInfo& channel = recording.channels[displayChannelIndices[displayRow]];
+            QVector<float> signal = extractChannelWindow(recording, channel, start, end, transformMode);
+            if (signal.size() != length) {
+                signal.resize(length);
+            }
+
+            if (isDigitalChannel(channel)) {
+                float minValue = 1.0f;
+                float maxValue = 0.0f;
+                double sum = 0.0;
+                double sumSq = 0.0;
+                int risingEdges = 0;
+                float previous = 0.0f;
+                bool havePrevious = false;
+                for (int sampleIndex = 0; sampleIndex < length; ++sampleIndex) {
+                    const float value = signal[sampleIndex] > 0.5f ? 1.0f : 0.0f;
+                    sum += value;
+                    sumSq += value * value;
+                    minValue = std::min(minValue, value);
+                    maxValue = std::max(maxValue, value);
+                    commonAccumulator[sampleIndex] += value - 0.5f;
+                    if (havePrevious && value > 0.5f && previous <= 0.5f) {
+                        ++risingEdges;
+                    }
+                    previous = value;
+                    havePrevious = true;
+                }
+
+                activity[displayRow] = static_cast<float>(sum / length);
+                rms[displayRow] = static_cast<float>(std::sqrt(sumSq / length));
+                ptp[displayRow] = maxValue - minValue;
+                events[displayRow] = static_cast<float>(risingEdges);
+            } else {
+                std::vector<float> scratch(signal.begin(), signal.end());
+                const float median = medianCopy(scratch);
+
+                double sumAbs = 0.0;
+                double sumSq = 0.0;
+                float minCentered = std::numeric_limits<float>::infinity();
+                float maxCentered = -std::numeric_limits<float>::infinity();
+                int crossingCount = 0;
+                float previousCentered = 0.0f;
+                bool havePrevious = false;
+
+                for (int sampleIndex = 0; sampleIndex < length; ++sampleIndex) {
+                    const float raw = signal[sampleIndex];
+                    const float centeredValue = raw - median;
+                    commonAccumulator[sampleIndex] += centeredValue;
+                    sumAbs += std::abs(raw);
+                    sumSq += centeredValue * centeredValue;
+                    minCentered = std::min(minCentered, centeredValue);
+                    maxCentered = std::max(maxCentered, centeredValue);
+                    if (havePrevious && centeredValue < result.eventThresholds[displayRow] && previousCentered >= result.eventThresholds[displayRow]) {
+                        ++crossingCount;
+                    }
+                    previousCentered = centeredValue;
+                    havePrevious = true;
+                }
+
+                activity[displayRow] = static_cast<float>(sumAbs / length);
+                rms[displayRow] = static_cast<float>(std::sqrt(sumSq / length));
+                ptp[displayRow] = maxCentered - minCentered;
+                events[displayRow] = static_cast<float>(crossingCount);
+            }
+
+            populationActivity += activity[displayRow];
+            populationEvents += events[displayRow];
         }
-        populationActivity /= std::max(recording.channelCount, 1);
+
+        for (float sampleMean : commonAccumulator) {
+            sampleMean /= std::max(displayChannelIndices.size(), 1);
+            commonModeSq += sampleMean * sampleMean;
+        }
+        populationActivity /= std::max(displayChannelIndices.size(), 1);
 
         const float baseline = [&]() {
             std::vector<float> activityCopy(activity.begin(), activity.end());
@@ -549,16 +1094,16 @@ HeatmapResult computeHeatmap(const RecordingData& recording) {
         double weightSum = 0.0;
         double xCenter = 0.0;
         double yCenter = 0.0;
-        for (int channel = 0; channel < recording.channelCount; ++channel) {
-            double weight = std::max(0.0f, activity[channel] - baseline);
-            if (weight <= 1e-6) {
-                weight = std::max(0.0f, activity[channel]);
+        for (int displayRow = 0; displayRow < displayChannelIndices.size(); ++displayRow) {
+            double weight = std::max(0.0f, activity[displayRow] - baseline);
+            if (weight <= 1.0e-6) {
+                weight = std::max(0.0f, activity[displayRow]);
             }
             weightSum += weight;
-            xCenter += weight * xCoords[channel];
-            yCenter += weight * yCoords[channel];
+            xCenter += weight * xCoords[displayRow];
+            yCenter += weight * yCoords[displayRow];
         }
-        if (weightSum > 1e-6) {
+        if (weightSum > 1.0e-6) {
             xCenters[binIndex] = static_cast<float>(xCenter / weightSum);
             yCenters[binIndex] = static_cast<float>(yCenter / weightSum);
         }
@@ -568,12 +1113,12 @@ HeatmapResult computeHeatmap(const RecordingData& recording) {
         result.commonModeSeries[binIndex] = static_cast<float>(std::sqrt(commonModeSq / length));
 
         for (int rowIndex = 0; rowIndex < result.rows; ++rowIndex) {
-            const int sourceChannel = order[rowIndex];
+            const int sourceRow = order[rowIndex];
             const int matrixIndex = rowIndex * result.cols + binIndex;
-            result.activityMatrix[matrixIndex] = activity[sourceChannel];
-            result.eventMatrix[matrixIndex] = events[sourceChannel];
-            result.rmsMatrix[matrixIndex] = rms[sourceChannel];
-            result.ptpMatrix[matrixIndex] = ptp[sourceChannel];
+            result.activityMatrix[matrixIndex] = activity[sourceRow];
+            result.eventMatrix[matrixIndex] = events[sourceRow];
+            result.rmsMatrix[matrixIndex] = rms[sourceRow];
+            result.ptpMatrix[matrixIndex] = ptp[sourceRow];
         }
     }
 
@@ -608,6 +1153,24 @@ QString overviewModeName(OverviewMode mode) {
         return QStringLiteral("Motion");
     }
     return QStringLiteral("Activity");
+}
+
+QString transformModeName(TransformMode mode) {
+    switch (mode) {
+    case TransformMode::Raw:
+        return QStringLiteral("Raw");
+    case TransformMode::Highpass300:
+        return QStringLiteral("High-pass 300 Hz");
+    case TransformMode::Bandpass300To6000:
+        return QStringLiteral("Band-pass 300-6000 Hz");
+    case TransformMode::Bandpass500To3000:
+        return QStringLiteral("Band-pass 500-3000 Hz");
+    case TransformMode::Lowpass250:
+        return QStringLiteral("Low-pass 250 Hz");
+    case TransformMode::Notch60:
+        return QStringLiteral("Notch 60 Hz");
+    }
+    return QStringLiteral("Raw");
 }
 
 }  // namespace spikeviewer

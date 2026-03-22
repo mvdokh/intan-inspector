@@ -264,6 +264,11 @@ void AllChannelsView::setRecording(const std::shared_ptr<spikeviewer::RecordingD
     update();
 }
 
+void AllChannelsView::setDisplayChannels(const QVector<int>& displayChannels) {
+    displayChannels_ = displayChannels;
+    update();
+}
+
 void AllChannelsView::setSelectedChannel(int selectedChannel) {
     selectedChannel_ = selectedChannel;
     update();
@@ -276,6 +281,11 @@ void AllChannelsView::setViewState(double startTime, double windowSeconds, doubl
     update();
 }
 
+void AllChannelsView::setTransformMode(spikeviewer::TransformMode transformMode) {
+    transformMode_ = transformMode;
+    update();
+}
+
 void AllChannelsView::paintEvent(QPaintEvent* event) {
     Q_UNUSED(event);
 
@@ -283,9 +293,9 @@ void AllChannelsView::paintEvent(QPaintEvent* event) {
     painter.fillRect(rect(), QColor::fromRgb(kPlotBackground));
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    if (!recording_ || !recording_->amplifier || !recording_->amplifier->isOpen()) {
+    if (!recording_ || displayChannels_.isEmpty()) {
         painter.setPen(QColor::fromRgb(kEmptyText));
-        painter.drawText(rect(), Qt::AlignCenter, QStringLiteral("Load an info.rhd to begin."));
+        painter.drawText(rect(), Qt::AlignCenter, recording_ ? QStringLiteral("No channels in this tab.") : QStringLiteral("Load an info.rhd to begin."));
         return;
     }
 
@@ -299,46 +309,49 @@ void AllChannelsView::paintEvent(QPaintEvent* event) {
     }
 
     const float displayScale = static_cast<float>(std::max(voltageScale_, 1.0e-6));
-    const int channelCount = recording_->channelCount;
+    const int channelCount = displayChannels_.size();
     const int targetPoints = std::max(400, plot.width() * 2);
 
     std::vector<float> ptps;
     ptps.reserve(static_cast<std::size_t>(channelCount));
+    std::vector<bool> digitalFlags;
+    digitalFlags.reserve(static_cast<std::size_t>(channelCount));
     std::vector<DownsampledTrace> traces;
     traces.reserve(static_cast<std::size_t>(channelCount));
 
     float spacing = 90.0f;
-    for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
-        const int sourceChannel = recording_->channels[channelIndex].index;
-        std::vector<float> samples(static_cast<std::size_t>(length));
+    for (int displayRow = 0; displayRow < channelCount; ++displayRow) {
+        const spikeviewer::ChannelInfo& channel = recording_->channels[displayChannels_[displayRow]];
+        const bool digitalChannel = spikeviewer::isDigitalChannel(channel);
+        const QVector<float> transformed = spikeviewer::extractChannelWindow(
+            *recording_, channel, start, end, transformMode_);
+        digitalFlags.push_back(digitalChannel);
+        if (transformed.isEmpty()) {
+            ptps.push_back(0.0f);
+            traces.push_back(DownsampledTrace{});
+            continue;
+        }
+        std::vector<float> samples(static_cast<std::size_t>(transformed.size()));
+        const float channelScale = digitalChannel
+            ? static_cast<float>(std::max(voltageScale_ * 48.0, 24.0))
+            : displayScale;
         float minRaw = std::numeric_limits<float>::infinity();
         float maxRaw = -std::numeric_limits<float>::infinity();
-        for (int offset = 0; offset < length; ++offset) {
-            const float raw = recording_->amplifier->sampleUv(start + offset, sourceChannel);
-            minRaw = std::min(minRaw, raw);
-            maxRaw = std::max(maxRaw, raw);
-            samples[static_cast<std::size_t>(offset)] = raw * displayScale;
+        for (int offset = 0; offset < transformed.size(); ++offset) {
+            const float rawValue = transformed[offset];
+            const float scaled = transformed[offset] * channelScale;
+            minRaw = std::min(minRaw, rawValue);
+            maxRaw = std::max(maxRaw, rawValue);
+            samples[static_cast<std::size_t>(offset)] = scaled;
         }
         ptps.push_back(maxRaw - minRaw);
         traces.push_back(downsampleTrace(samples, targetPoints));
     }
 
     spacing = std::max(percentileCopy(ptps, 0.75f) * 1.2f, 90.0f);
-
-    float globalMin = std::numeric_limits<float>::infinity();
-    float globalMax = -std::numeric_limits<float>::infinity();
-    for (int visualIndex = 0; visualIndex < channelCount; ++visualIndex) {
-        const float offset = static_cast<float>((channelCount - 1 - visualIndex) * spacing);
-        const DownsampledTrace& trace = traces[static_cast<std::size_t>(visualIndex)];
-        for (float value : trace.y) {
-            globalMin = std::min(globalMin, value + offset);
-            globalMax = std::max(globalMax, value + offset);
-        }
-    }
-    if (!std::isfinite(globalMin) || !std::isfinite(globalMax) || std::abs(globalMax - globalMin) < 1.0e-6f) {
-        globalMin = -1.0f;
-        globalMax = 1.0f;
-    }
+    const float channelMargin = spacing * 0.75f;
+    const float globalMin = -channelMargin;
+    const float globalMax = (static_cast<float>(std::max(channelCount - 1, 0)) * spacing) + channelMargin;
 
     for (int visualIndex = 0; visualIndex < channelCount; ++visualIndex) {
         const DownsampledTrace& trace = traces[static_cast<std::size_t>(visualIndex)];
@@ -347,16 +360,34 @@ void AllChannelsView::paintEvent(QPaintEvent* event) {
         }
         const float offset = static_cast<float>((channelCount - 1 - visualIndex) * spacing);
         QPolygonF polyline;
-        polyline.reserve(trace.x.size());
-        for (int i = 0; i < trace.x.size(); ++i) {
-            const qreal x = plot.left() + (trace.x[i] * plot.width());
-            const float yValue = trace.y[i] + offset;
-            const float yRatio = normalizeToRange(yValue, globalMin, globalMax);
-            const qreal y = plot.bottom() - (yRatio * plot.height());
-            polyline.append(QPointF(x, y));
+        const bool digitalChannel = digitalFlags[static_cast<std::size_t>(visualIndex)];
+        if (digitalChannel) {
+            polyline.reserve((trace.x.size() * 2) + 2);
+            auto yForValue = [&](float value) {
+                const float yValue = value + offset;
+                const float yRatio = normalizeToRange(yValue, globalMin, globalMax);
+                return plot.bottom() - (yRatio * plot.height());
+            };
+            polyline.append(QPointF(plot.left(), yForValue(trace.y.front())));
+            for (int i = 1; i < trace.x.size(); ++i) {
+                const qreal x = plot.left() + (trace.x[i] * plot.width());
+                const qreal previousY = yForValue(trace.y[i - 1]);
+                const qreal currentY = yForValue(trace.y[i]);
+                polyline.append(QPointF(x, previousY));
+                polyline.append(QPointF(x, currentY));
+            }
+        } else {
+            polyline.reserve(trace.x.size());
+            for (int i = 0; i < trace.x.size(); ++i) {
+                const qreal x = plot.left() + (trace.x[i] * plot.width());
+                const float yValue = trace.y[i] + offset;
+                const float yRatio = normalizeToRange(yValue, globalMin, globalMax);
+                const qreal y = plot.bottom() - (yRatio * plot.height());
+                polyline.append(QPointF(x, y));
+            }
         }
 
-        QColor color = channelColor(visualIndex, channelCount);
+        QColor color = channelColor(visualIndex, std::max(channelCount, 1));
         color.setAlpha(visualIndex == selectedChannel_ ? 255 : 210);
         QPen pen(color);
         pen.setWidthF(visualIndex == selectedChannel_ ? 1.6 : 0.95);
@@ -376,6 +407,11 @@ void DetailTraceView::setRecording(const std::shared_ptr<spikeviewer::RecordingD
     update();
 }
 
+void DetailTraceView::setDisplayChannels(const QVector<int>& displayChannels) {
+    displayChannels_ = displayChannels;
+    update();
+}
+
 void DetailTraceView::setSelectedChannel(int selectedChannel) {
     selectedChannel_ = selectedChannel;
     update();
@@ -388,6 +424,11 @@ void DetailTraceView::setViewState(double startTime, double windowSeconds, doubl
     update();
 }
 
+void DetailTraceView::setTransformMode(spikeviewer::TransformMode transformMode) {
+    transformMode_ = transformMode;
+    update();
+}
+
 void DetailTraceView::paintEvent(QPaintEvent* event) {
     Q_UNUSED(event);
 
@@ -395,7 +436,7 @@ void DetailTraceView::paintEvent(QPaintEvent* event) {
     painter.fillRect(rect(), QColor::fromRgb(kPlotBackground));
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    if (!recording_ || !recording_->amplifier || !recording_->amplifier->isOpen() || selectedChannel_ < 0 || selectedChannel_ >= recording_->channels.size()) {
+    if (!recording_ || selectedChannel_ < 0 || selectedChannel_ >= displayChannels_.size()) {
         painter.setPen(QColor::fromRgb(kEmptyText));
         painter.drawText(rect(), Qt::AlignCenter, QStringLiteral("Select a channel"));
         return;
@@ -412,40 +453,76 @@ void DetailTraceView::paintEvent(QPaintEvent* event) {
         return;
     }
 
-    const int sourceChannel = recording_->channels[selectedChannel_].index;
-    std::vector<float> samples(static_cast<std::size_t>(length));
-    float minValue = std::numeric_limits<float>::infinity();
-    float maxValue = -std::numeric_limits<float>::infinity();
+    const spikeviewer::ChannelInfo& channel = recording_->channels[displayChannels_[selectedChannel_]];
+    const QVector<float> transformed = spikeviewer::extractChannelWindow(
+        *recording_, channel, start, end, transformMode_);
+    if (transformed.isEmpty()) {
+        painter.setPen(QColor::fromRgb(kEmptyText));
+        painter.drawText(rect(), Qt::AlignCenter, QStringLiteral("No samples in this window"));
+        return;
+    }
+    const bool digitalChannel = spikeviewer::isDigitalChannel(channel);
+    std::vector<float> samples(static_cast<std::size_t>(transformed.size()));
+    std::vector<float> values;
+    values.reserve(static_cast<std::size_t>(transformed.size()));
     const float displayScale = static_cast<float>(std::max(voltageScale_, 1.0e-6));
 
-    for (int offset = 0; offset < length; ++offset) {
-        const float value = recording_->amplifier->sampleUv(start + offset, sourceChannel) * displayScale;
+    for (int offset = 0; offset < transformed.size(); ++offset) {
+        const float value = transformed[offset];
         samples[static_cast<std::size_t>(offset)] = value;
-        minValue = std::min(minValue, value);
-        maxValue = std::max(maxValue, value);
+        values.push_back(value);
     }
-    if (std::abs(maxValue - minValue) < 1.0e-6f) {
-        minValue -= 1.0f;
-        maxValue += 1.0f;
-    }
-    const float margin = (maxValue - minValue) * 0.08f;
-    minValue -= margin;
-    maxValue += margin;
 
-    const DownsampledTrace trace = downsampleTrace(samples, std::max(500, plot.width() * 2));
+    float centerValue = 0.0f;
+    float halfRange = 1.0f;
+    if (digitalChannel) {
+        centerValue = 0.5f;
+        halfRange = std::max(0.65f / displayScale, 0.05f);
+    } else {
+        centerValue = percentileCopy(values, 0.5f);
+        std::vector<float> deviations;
+        deviations.reserve(values.size());
+        for (float value : values) {
+            deviations.push_back(std::abs(value - centerValue));
+        }
+        halfRange = std::max(percentileCopy(deviations, 0.985f) * 1.25f, 10.0f);
+        halfRange = std::max(halfRange / displayScale, 1.0f);
+    }
+    const float minDisplay = centerValue - halfRange;
+    const float maxDisplay = centerValue + halfRange;
+
     QPolygonF polyline;
-    polyline.reserve(trace.x.size());
     const double traceStartTime = static_cast<double>(start) / recording_->sampleRate;
     const double traceEndTime = static_cast<double>(end) / recording_->sampleRate;
     const double centerTime = static_cast<double>(centerSample) / recording_->sampleRate;
-    for (int i = 0; i < trace.x.size(); ++i) {
-        const qreal x = plot.left() + (trace.x[i] * plot.width());
-        const float yRatio = normalizeToRange(trace.y[i], minValue, maxValue);
-        const qreal y = plot.bottom() - (yRatio * plot.height());
-        polyline.append(QPointF(x, y));
+    if (digitalChannel) {
+        polyline.reserve((transformed.size() * 2) + 2);
+        auto yForValue = [&](float value) {
+            const float yRatio = normalizeToRange(value, minDisplay, maxDisplay);
+            return plot.bottom() - (yRatio * plot.height());
+        };
+        const qreal firstY = yForValue(transformed.front());
+        polyline.append(QPointF(plot.left(), firstY));
+        for (int i = 1; i < transformed.size(); ++i) {
+            const float ratio = static_cast<float>(i) / static_cast<float>(std::max(transformed.size() - 1, 1));
+            const qreal x = plot.left() + (ratio * plot.width());
+            const qreal previousY = yForValue(transformed[i - 1]);
+            const qreal currentY = yForValue(transformed[i]);
+            polyline.append(QPointF(x, previousY));
+            polyline.append(QPointF(x, currentY));
+        }
+    } else {
+        const DownsampledTrace trace = downsampleTrace(samples, std::max(500, plot.width() * 2));
+        polyline.reserve(trace.x.size());
+        for (int i = 0; i < trace.x.size(); ++i) {
+            const qreal x = plot.left() + (trace.x[i] * plot.width());
+            const float yRatio = normalizeToRange(trace.y[i], minDisplay, maxDisplay);
+            const qreal y = plot.bottom() - (yRatio * plot.height());
+            polyline.append(QPointF(x, y));
+        }
     }
 
-    QColor color = channelColor(selectedChannel_, recording_->channelCount);
+    QColor color = channelColor(selectedChannel_, std::max(displayChannels_.size(), 1));
     QPen pen(color);
     pen.setWidthF(1.35);
     pen.setCosmetic(true);

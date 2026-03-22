@@ -900,6 +900,4 @@ CMakeFiles/spike_viewer_native.dir/spike_viewer_native_autogen/mocs_compilation.
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmainwindow.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen/EWIEGA46WW/moc_widgets.cpp

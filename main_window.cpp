@@ -1,19 +1,26 @@
 #include "main_window.h"
 
 #include <QComboBox>
+#include <QCursor>
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QFutureWatcher>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRegularExpression>
+#include <QScrollArea>
+#include <QScreen>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSplitter>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <QtConcurrent>
 
@@ -46,12 +53,49 @@ float medianCopy(std::vector<float> values) {
     return 0.5f * (upper + values[mid - 1]);
 }
 
+bool isPrimaryElectrodeLabel(const QString& label) {
+    static const QRegularExpression pattern(QStringLiteral("^A-(\\d{3})$"));
+    const QRegularExpressionMatch match = pattern.match(label.trimmed());
+    if (!match.hasMatch()) {
+        return false;
+    }
+    bool ok = false;
+    const int numeric = match.captured(1).toInt(&ok);
+    return ok && numeric >= 0 && numeric <= 31;
+}
+
+bool isAuxLikeLabel(const QString& label) {
+    const QString upper = label.trimmed().toUpper();
+    return upper.contains(QStringLiteral("AUX"))
+        || upper.contains(QStringLiteral("DIGITAL IN"))
+        || upper.startsWith(QStringLiteral("CH "))
+        || upper.startsWith(QStringLiteral("CH-"))
+        || upper == QStringLiteral("CH");
+}
+
+QRect initialWindowGeometry() {
+    QScreen* screen = QGuiApplication::screenAt(QCursor::pos());
+    if (screen == nullptr) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    if (screen == nullptr) {
+        return QRect(80, 80, 1280, 820);
+    }
+
+    const QRect available = screen->availableGeometry();
+    const int width = std::clamp(static_cast<int>(std::llround(available.width() * 0.86)), 980, available.width());
+    const int height = std::clamp(static_cast<int>(std::llround(available.height() * 0.86)), 720, available.height());
+    const int x = available.x() + ((available.width() - width) / 2);
+    const int y = available.y() + ((available.height() - height) / 2);
+    return QRect(x, y, width, height);
+}
+
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
     setWindowTitle(QStringLiteral("Spike Sort Viewer"));
-    resize(1460, 900);
+    setGeometry(initialWindowGeometry());
     buildUi();
 }
 
@@ -64,38 +108,40 @@ void MainWindow::loadPath(const QString& path) {
     }
 
     recording_ = recording;
-    heatmap_.reset();
-    selectedChannel_ = -1;
-    ++heatmapGeneration_;
-
-    traceView_->setRecording(recording_);
-    traceView_->setSelectedChannel(selectedChannel_);
-    detailView_->setRecording(recording_);
-    detailView_->setSelectedChannel(selectedChannel_);
-    overviewView_->setRecording(recording_);
-    overviewView_->setSelectedChannel(selectedChannel_);
-    overviewView_->clearHeatmap();
-
-    populateChannelList();
-
-    const double maxTime = std::max(recording_->durationSeconds - windowSpin_->value(), 0.0);
-    {
-        const QSignalBlocker spinBlocker(timeSpin_);
-        timeSpin_->setRange(0.0, maxTime);
-        timeSpin_->setValue(0.0);
-    }
+    configureChannelGroups();
+    populateChannelLists();
 
     summaryLabel_->setText(
-        QStringLiteral("%1 | %2 channels | %3 Hz | %4 min")
+        QStringLiteral("%1 | %2 amp | %3 aux/digital | %4 Hz | %5 min")
             .arg(QFileInfo(recording_->infoPath).fileName())
             .arg(recording_->channelCount)
+            .arg(std::max(0, recording_->channels.size() - recording_->channelCount))
             .arg(recording_->sampleRate, 0, 'f', 0)
             .arg(recording_->durationSeconds / 60.0, 0, 'f', 1)
     );
-    statusLabel_->setText(QStringLiteral("Loaded recording. Computing activity heatmap in the background."));
+
+    const double maxTime = std::max(recording_->durationSeconds - windowSpin_->value(), 0.0);
+    {
+        const QSignalBlocker blocker(timeSpin_);
+        timeSpin_->setRange(0.0, maxTime);
+        timeSpin_->setValue(0.0);
+    }
+    {
+        const QSignalBlocker blocker(timeSlider_);
+        timeSlider_->setRange(0, std::max(0, static_cast<int>(std::llround(maxTime * 1000.0))));
+        timeSlider_->setValue(0);
+    }
+
+    groupTabs_->setCurrentIndex(0);
+    statusLabel_->setText(
+        QStringLiteral("Loaded recording. Computing %1 overview for both channel tabs.")
+            .arg(spikeviewer::transformModeName(currentTransformMode()))
+    );
 
     refreshViews();
-    startHeatmapWorker();
+    for (int groupIndex = 0; groupIndex < groups_.size(); ++groupIndex) {
+        startHeatmapWorker(groupIndex);
+    }
 }
 
 void MainWindow::buildUi() {
@@ -154,7 +200,7 @@ void MainWindow::buildUi() {
         refreshViews();
     });
 
-    controlRow->addWidget(new QLabel(QStringLiteral("Scale"), outer));
+    controlRow->addWidget(new QLabel(QStringLiteral("Stack Scale"), outer));
     scaleSpin_ = new QDoubleSpinBox(outer);
     scaleSpin_->setDecimals(2);
     scaleSpin_->setRange(0.1, 20.0);
@@ -165,39 +211,45 @@ void MainWindow::buildUi() {
         refreshViews();
     });
 
-    timeSlider_ = new QSlider(Qt::Horizontal, outer);
-    timeSlider_->setRange(0, 1000);
-    rootLayout->addWidget(timeSlider_);
-    connect(timeSlider_, &QSlider::valueChanged, this, [this](int value) {
+    controlRow->addWidget(new QLabel(QStringLiteral("Detail Scale"), outer));
+    detailScaleSpin_ = new QDoubleSpinBox(outer);
+    detailScaleSpin_->setDecimals(2);
+    detailScaleSpin_->setRange(0.05, 20.0);
+    detailScaleSpin_->setSingleStep(0.05);
+    detailScaleSpin_->setValue(0.5);
+    controlRow->addWidget(detailScaleSpin_);
+    connect(detailScaleSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) {
+        refreshViews();
+    });
+
+    controlRow->addWidget(new QLabel(QStringLiteral("Transform"), outer));
+    transformCombo_ = new QComboBox(outer);
+    transformCombo_->addItems({
+        QStringLiteral("Raw"),
+        QStringLiteral("High-pass 300 Hz"),
+        QStringLiteral("Band-pass 300-6000 Hz"),
+        QStringLiteral("Band-pass 500-3000 Hz"),
+        QStringLiteral("Low-pass 250 Hz"),
+        QStringLiteral("Notch 60 Hz"),
+    });
+    controlRow->addWidget(transformCombo_);
+    connect(transformCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
         if (!recording_) {
+            refreshViews();
             return;
         }
-        const double timeSeconds = static_cast<double>(value) / 1000.0;
-        {
-            const QSignalBlocker blocker(timeSpin_);
-            timeSpin_->setValue(timeSeconds);
+        statusLabel_->setText(
+            QStringLiteral("Applying %1 and recomputing tab overviews.")
+                .arg(spikeviewer::transformModeName(currentTransformMode()))
+        );
+        refreshViews();
+        for (int groupIndex = 0; groupIndex < groups_.size(); ++groupIndex) {
+            startHeatmapWorker(groupIndex);
         }
-        refreshViews();
     });
 
-    auto* body = new QSplitter(Qt::Horizontal, outer);
-    rootLayout->addWidget(body, 1);
-
-    auto* sidebar = new QWidget(body);
-    auto* sidebarLayout = new QVBoxLayout(sidebar);
-    sidebarLayout->setContentsMargins(4, 4, 4, 4);
-    sidebarLayout->setSpacing(6);
-    sidebarLayout->addWidget(new QLabel(QStringLiteral("Channels"), sidebar));
-
-    channelList_ = new QListWidget(sidebar);
-    sidebarLayout->addWidget(channelList_, 1);
-    connect(channelList_, &QListWidget::currentRowChanged, this, [this](int row) {
-        selectedChannel_ = row >= 0 ? row : -1;
-        refreshViews();
-    });
-
-    sidebarLayout->addWidget(new QLabel(QStringLiteral("Overview"), sidebar));
-    overviewCombo_ = new QComboBox(sidebar);
+    controlRow->addWidget(new QLabel(QStringLiteral("Overview"), outer));
+    overviewCombo_ = new QComboBox(outer);
     overviewCombo_->addItems({
         QStringLiteral("Activity"),
         QStringLiteral("Events"),
@@ -206,33 +258,103 @@ void MainWindow::buildUi() {
         QStringLiteral("Population"),
         QStringLiteral("Motion"),
     });
-    sidebarLayout->addWidget(overviewCombo_);
+    controlRow->addWidget(overviewCombo_);
     connect(overviewCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
         refreshViews();
     });
 
-    statusLabel_ = new QLabel(QStringLiteral("Load an info.rhd to begin."), sidebar);
+    timeSlider_ = new QSlider(Qt::Horizontal, outer);
+    timeSlider_->setRange(0, 1000);
+    rootLayout->addWidget(timeSlider_);
+    connect(timeSlider_, &QSlider::valueChanged, this, [this](int value) {
+        if (!recording_) {
+            return;
+        }
+        const double seconds = static_cast<double>(value) / 1000.0;
+        {
+            const QSignalBlocker blocker(timeSpin_);
+            timeSpin_->setValue(seconds);
+        }
+        refreshViews();
+    });
+
+    statusLabel_ = new QLabel(QStringLiteral("Load an info.rhd to begin."), outer);
     statusLabel_->setWordWrap(true);
-    statusLabel_->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    sidebarLayout->addWidget(statusLabel_);
+    rootLayout->addWidget(statusLabel_);
+
+    groupTabs_ = new QTabWidget(outer);
+    rootLayout->addWidget(groupTabs_, 1);
+    connect(groupTabs_, &QTabWidget::currentChanged, this, [this](int) {
+        refreshViews();
+    });
+
+    createGroupPage(QStringLiteral("Main Channels"));
+    createGroupPage(QStringLiteral("Aux / Digital"));
+}
+
+void MainWindow::createGroupPage(const QString& baseTitle) {
+    const int groupIndex = groups_.size();
+    groups_.push_back(ChannelGroupUi{});
+    ChannelGroupUi& group = groups_.last();
+    group.baseTitle = baseTitle;
+
+    auto* page = new QWidget(groupTabs_);
+    auto* pageLayout = new QHBoxLayout(page);
+    pageLayout->setContentsMargins(0, 0, 0, 0);
+    pageLayout->setSpacing(4);
+
+    auto* body = new QSplitter(Qt::Horizontal, page);
+    body->setChildrenCollapsible(false);
+    pageLayout->addWidget(body, 1);
+
+    auto* sidebar = new QWidget(body);
+    auto* sidebarLayout = new QVBoxLayout(sidebar);
+    sidebarLayout->setContentsMargins(4, 4, 4, 4);
+    sidebarLayout->setSpacing(6);
+    sidebarLayout->addWidget(new QLabel(QStringLiteral("Channels"), sidebar));
+
+    group.channelList = new QListWidget(sidebar);
+    sidebarLayout->addWidget(group.channelList, 1);
+    connect(group.channelList, &QListWidget::currentRowChanged, this, [this, groupIndex](int row) {
+        if (groupIndex < 0 || groupIndex >= groups_.size()) {
+            return;
+        }
+        groups_[groupIndex].selectedRow = row >= 0 ? row : -1;
+        refreshViews();
+    });
 
     auto* contentSplitter = new QSplitter(Qt::Vertical, body);
-
-    traceView_ = new AllChannelsView(contentSplitter);
+    contentSplitter->setChildrenCollapsible(false);
+    group.traceView = new AllChannelsView(contentSplitter);
+    group.traceView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     auto* lowerSplitter = new QSplitter(Qt::Horizontal, contentSplitter);
+    lowerSplitter->setChildrenCollapsible(false);
     auto* statsFrame = new QFrame(lowerSplitter);
     statsFrame->setFrameShape(QFrame::StyledPanel);
+    statsFrame->setMinimumHeight(0);
     auto* statsLayout = new QVBoxLayout(statsFrame);
     statsLayout->setContentsMargins(8, 8, 8, 8);
-    statsLabel_ = new QLabel(QStringLiteral("Select a channel"), statsFrame);
-    statsLabel_->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    statsLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    statsLayout->addWidget(statsLabel_);
+    auto* statsScroll = new QScrollArea(statsFrame);
+    statsScroll->setFrameShape(QFrame::NoFrame);
+    statsScroll->setWidgetResizable(true);
+    auto* statsScrollContent = new QWidget(statsScroll);
+    auto* statsScrollLayout = new QVBoxLayout(statsScrollContent);
+    statsScrollLayout->setContentsMargins(0, 0, 0, 0);
+    statsScrollLayout->setSpacing(0);
+    group.statsLabel = new QLabel(QStringLiteral("Select a channel"), statsScrollContent);
+    group.statsLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    group.statsLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    statsScrollLayout->addWidget(group.statsLabel, 0, Qt::AlignTop);
+    statsScrollLayout->addStretch(1);
+    statsScroll->setWidget(statsScrollContent);
+    statsLayout->addWidget(statsScroll, 1);
 
-    detailView_ = new DetailTraceView(lowerSplitter);
-    overviewView_ = new OverviewView(lowerSplitter);
-    connect(overviewView_, &OverviewView::timeJumpRequested, this, [this](double seconds) {
+    group.detailView = new DetailTraceView(lowerSplitter);
+    group.detailView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    group.overviewView = new OverviewView(lowerSplitter);
+    group.overviewView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    connect(group.overviewView, &OverviewView::timeJumpRequested, this, [this](double seconds) {
         if (!recording_) {
             return;
         }
@@ -245,27 +367,138 @@ void MainWindow::buildUi() {
         refreshViews();
     });
 
-    body->setSizes({220, 1240});
+    body->setSizes({230, 1250});
+    body->setStretchFactor(0, 0);
+    body->setStretchFactor(1, 1);
     contentSplitter->setStretchFactor(0, 4);
     contentSplitter->setStretchFactor(1, 1);
+    contentSplitter->setSizes({720, 260});
     lowerSplitter->setSizes({220, 520, 520});
+
+    group.page = page;
+    groupTabs_->addTab(page, baseTitle);
 }
 
-void MainWindow::populateChannelList() {
-    channelList_->clear();
+void MainWindow::configureChannelGroups() {
     if (!recording_) {
+        for (ChannelGroupUi& group : groups_) {
+            group.displayChannels.clear();
+            group.selectedRow = -1;
+            group.heatmap.reset();
+            ++group.heatmapGeneration;
+        }
         return;
     }
-    for (const spikeviewer::ChannelInfo& channel : recording_->channels) {
-        channelList_->addItem(
-            QStringLiteral("%1 | %2 | (%3, %4)")
-                .arg(channel.electrodeId, 2, 10, QChar('0'))
-                .arg(channel.label)
-                .arg(channel.x, 0, 'g', 6)
-                .arg(channel.y, 0, 'g', 6)
-        );
+
+    const QVector<int> primaryChannels = detectPrimaryChannels();
+    const QVector<int> auxChannels = detectAuxChannels(primaryChannels);
+
+    if (!groups_.isEmpty()) {
+        groups_[0].displayChannels = primaryChannels;
+        groups_[0].selectedRow = -1;
+        groups_[0].heatmap.reset();
+        ++groups_[0].heatmapGeneration;
     }
-    channelList_->clearSelection();
+    if (groups_.size() > 1) {
+        groups_[1].displayChannels = auxChannels;
+        groups_[1].selectedRow = -1;
+        groups_[1].heatmap.reset();
+        ++groups_[1].heatmapGeneration;
+    }
+}
+
+QVector<int> MainWindow::detectPrimaryChannels() const {
+    QVector<int> primary;
+    if (!recording_) {
+        return primary;
+    }
+
+    for (int channelIndex = 0; channelIndex < recording_->channels.size(); ++channelIndex) {
+        const spikeviewer::ChannelInfo& channel = recording_->channels[channelIndex];
+        if (!spikeviewer::isDigitalChannel(channel) && isPrimaryElectrodeLabel(channel.label)) {
+            primary.push_back(channelIndex);
+        }
+    }
+    if (!primary.isEmpty()) {
+        return primary;
+    }
+
+    for (int channelIndex = 0; channelIndex < recording_->channels.size(); ++channelIndex) {
+        const spikeviewer::ChannelInfo& channel = recording_->channels[channelIndex];
+        if (!spikeviewer::isDigitalChannel(channel) && !isAuxLikeLabel(channel.label)) {
+            primary.push_back(channelIndex);
+        }
+    }
+    if (!primary.isEmpty()) {
+        return primary;
+    }
+
+    for (int channelIndex = 0; channelIndex < recording_->channels.size(); ++channelIndex) {
+        if (!spikeviewer::isDigitalChannel(recording_->channels[channelIndex])) {
+            primary.push_back(channelIndex);
+        }
+    }
+    if (!primary.isEmpty()) {
+        return primary;
+    }
+
+    for (int channelIndex = 0; channelIndex < recording_->channels.size(); ++channelIndex) {
+        primary.push_back(channelIndex);
+    }
+    return primary;
+}
+
+QVector<int> MainWindow::detectAuxChannels(const QVector<int>& primaryChannels) const {
+    QVector<int> aux;
+    if (!recording_) {
+        return aux;
+    }
+
+    QVector<bool> isPrimary(recording_->channels.size(), false);
+    for (int channelIndex : primaryChannels) {
+        if (channelIndex >= 0 && channelIndex < isPrimary.size()) {
+            isPrimary[channelIndex] = true;
+        }
+    }
+
+    for (int channelIndex = 0; channelIndex < recording_->channels.size(); ++channelIndex) {
+        if (!isPrimary[channelIndex]) {
+            aux.push_back(channelIndex);
+        }
+    }
+    return aux;
+}
+
+void MainWindow::populateChannelLists() {
+    for (int groupIndex = 0; groupIndex < groups_.size(); ++groupIndex) {
+        ChannelGroupUi& group = groups_[groupIndex];
+        group.channelList->clear();
+        if (recording_) {
+            for (int displayChannel : group.displayChannels) {
+                const spikeviewer::ChannelInfo& channel = recording_->channels[displayChannel];
+                group.channelList->addItem(
+                    QStringLiteral("%1 | %2 | (%3, %4)")
+                        .arg(channel.electrodeId, 2, 10, QChar('0'))
+                        .arg(channel.label)
+                        .arg(channel.x, 0, 'g', 6)
+                        .arg(channel.y, 0, 'g', 6)
+                );
+            }
+        }
+
+        if (group.selectedRow >= group.displayChannels.size()) {
+            group.selectedRow = -1;
+        }
+        {
+            const QSignalBlocker blocker(group.channelList);
+            group.channelList->setCurrentRow(group.selectedRow);
+        }
+        groupTabs_->setTabText(groupIndex, QStringLiteral("%1 (%2)").arg(group.baseTitle).arg(group.displayChannels.size()));
+    }
+}
+
+int MainWindow::activeGroupIndex() const {
+    return groupTabs_ ? std::clamp(groupTabs_->currentIndex(), 0, std::max(groups_.size() - 1, 0)) : 0;
 }
 
 std::pair<int, int> MainWindow::timeWindowIndices(double startTime) const {
@@ -296,77 +529,131 @@ spikeviewer::OverviewMode MainWindow::currentOverviewMode() const {
     }
 }
 
+spikeviewer::TransformMode MainWindow::currentTransformMode() const {
+    switch (transformCombo_->currentIndex()) {
+    case 1:
+        return spikeviewer::TransformMode::Highpass300;
+    case 2:
+        return spikeviewer::TransformMode::Bandpass300To6000;
+    case 3:
+        return spikeviewer::TransformMode::Bandpass500To3000;
+    case 4:
+        return spikeviewer::TransformMode::Lowpass250;
+    case 5:
+        return spikeviewer::TransformMode::Notch60;
+    case 0:
+    default:
+        return spikeviewer::TransformMode::Raw;
+    }
+}
+
 void MainWindow::updateSliderRange() {
     if (!recording_) {
         timeSlider_->setRange(0, 1000);
         return;
     }
     const double maxTime = std::max(recording_->durationSeconds - windowSpin_->value(), 0.0);
-    const int maxSlider = std::max(0, static_cast<int>(std::llround(maxTime * 1000.0)));
     const double clampedTime = std::clamp(timeSpin_->value(), 0.0, maxTime);
     {
-        const QSignalBlocker timeBlocker(timeSpin_);
+        const QSignalBlocker blocker(timeSpin_);
         timeSpin_->setRange(0.0, maxTime);
         timeSpin_->setValue(clampedTime);
     }
     {
-        const QSignalBlocker sliderBlocker(timeSlider_);
-        timeSlider_->setRange(0, maxSlider);
+        const QSignalBlocker blocker(timeSlider_);
+        timeSlider_->setRange(0, std::max(0, static_cast<int>(std::llround(maxTime * 1000.0))));
         timeSlider_->setValue(static_cast<int>(std::llround(clampedTime * 1000.0)));
     }
 }
 
 void MainWindow::refreshViews() {
     if (!recording_) {
-        traceView_->setRecording({});
-        detailView_->setRecording({});
-        overviewView_->setRecording({});
-        statsLabel_->setText(QStringLiteral("Select a channel"));
+        for (ChannelGroupUi& group : groups_) {
+            group.traceView->setRecording({});
+            group.detailView->setRecording({});
+            group.overviewView->setRecording({});
+            group.statsLabel->setText(QStringLiteral("Select a channel"));
+        }
         statusLabel_->setText(QStringLiteral("Load an info.rhd to begin."));
         return;
     }
 
     updateSliderRange();
-
     const double maxTime = std::max(recording_->durationSeconds - windowSpin_->value(), 0.0);
     const double startTime = std::clamp(timeSpin_->value(), 0.0, maxTime);
     {
-        const QSignalBlocker timeBlocker(timeSpin_);
+        const QSignalBlocker blocker(timeSpin_);
         timeSpin_->setValue(startTime);
     }
     {
-        const QSignalBlocker sliderBlocker(timeSlider_);
+        const QSignalBlocker blocker(timeSlider_);
         timeSlider_->setValue(static_cast<int>(std::llround(startTime * 1000.0)));
     }
 
-    traceView_->setRecording(recording_);
-    traceView_->setSelectedChannel(selectedChannel_);
-    traceView_->setViewState(startTime, windowSpin_->value(), scaleSpin_->value());
+    for (int groupIndex = 0; groupIndex < groups_.size(); ++groupIndex) {
+        refreshGroupView(groupIndex);
+    }
 
-    detailView_->setRecording(recording_);
-    detailView_->setSelectedChannel(selectedChannel_);
-    detailView_->setViewState(startTime, windowSpin_->value(), scaleSpin_->value());
-
-    overviewView_->setRecording(recording_);
-    overviewView_->setHeatmap(heatmap_);
-    overviewView_->setMode(currentOverviewMode());
-    overviewView_->setSelectedChannel(selectedChannel_);
-    overviewView_->setTimeSeconds(startTime);
-
-    updateStatsPanel();
-    statusLabel_->setText(
-        heatmap_
-            ? QStringLiteral("Overview ready. Click it to jump through the recording.")
-            : QStringLiteral("Showing all channels from %1s to %2s.")
-                  .arg(startTime, 0, 'f', 4)
-                  .arg(startTime + windowSpin_->value(), 0, 'f', 4)
-    );
+    const ChannelGroupUi& activeGroup = groups_[activeGroupIndex()];
+    if (activeGroup.displayChannels.isEmpty()) {
+        statusLabel_->setText(QStringLiteral("This tab has no channels for the current recording."));
+    } else if (activeGroup.heatmap) {
+        statusLabel_->setText(
+            QStringLiteral("%1 ready with %2. Click the overview to jump through the recording.")
+                .arg(activeGroup.baseTitle)
+                .arg(spikeviewer::transformModeName(currentTransformMode()))
+        );
+    } else {
+        statusLabel_->setText(
+            QStringLiteral("Showing %1 from %2s to %3s with %4 while the overview recomputes.")
+                .arg(activeGroup.baseTitle)
+                .arg(startTime, 0, 'f', 4)
+                .arg(startTime + windowSpin_->value(), 0, 'f', 4)
+                .arg(spikeviewer::transformModeName(currentTransformMode()))
+        );
+    }
 }
 
-void MainWindow::updateStatsPanel() {
-    if (!recording_ || selectedChannel_ < 0 || selectedChannel_ >= recording_->channels.size()) {
-        statsLabel_->setStyleSheet({});
-        statsLabel_->setText(QStringLiteral("Select a channel"));
+void MainWindow::refreshGroupView(int groupIndex) {
+    if (groupIndex < 0 || groupIndex >= groups_.size()) {
+        return;
+    }
+
+    ChannelGroupUi& group = groups_[groupIndex];
+    group.traceView->setRecording(recording_);
+    group.traceView->setDisplayChannels(group.displayChannels);
+    group.traceView->setSelectedChannel(group.selectedRow);
+    group.traceView->setTransformMode(currentTransformMode());
+    group.traceView->setViewState(timeSpin_->value(), windowSpin_->value(), scaleSpin_->value());
+
+    group.detailView->setRecording(recording_);
+    group.detailView->setDisplayChannels(group.displayChannels);
+    group.detailView->setSelectedChannel(group.selectedRow);
+    group.detailView->setTransformMode(currentTransformMode());
+    group.detailView->setViewState(timeSpin_->value(), windowSpin_->value(), detailScaleSpin_->value());
+
+    group.overviewView->setRecording(recording_);
+    group.overviewView->setHeatmap(group.heatmap);
+    group.overviewView->setMode(currentOverviewMode());
+    group.overviewView->setSelectedChannel(group.selectedRow);
+    group.overviewView->setTimeSeconds(timeSpin_->value());
+
+    updateGroupStatsPanel(groupIndex);
+}
+
+void MainWindow::updateGroupStatsPanel(int groupIndex) {
+    if (groupIndex < 0 || groupIndex >= groups_.size()) {
+        return;
+    }
+
+    ChannelGroupUi& group = groups_[groupIndex];
+    if (!recording_ || group.selectedRow < 0 || group.selectedRow >= group.displayChannels.size()) {
+        group.statsLabel->setStyleSheet({});
+        group.statsLabel->setText(
+            group.displayChannels.isEmpty()
+                ? QStringLiteral("No channels in this tab")
+                : QStringLiteral("Select a channel")
+        );
         return;
     }
 
@@ -374,127 +661,177 @@ void MainWindow::updateStatsPanel() {
     const auto [start, end] = timeWindowIndices(startTime);
     const int length = end - start;
     if (length <= 0) {
-        statsLabel_->setText(QStringLiteral("Select a channel"));
+        group.statsLabel->setText(QStringLiteral("Select a channel"));
         return;
     }
 
-    const spikeviewer::ChannelInfo& channel = recording_->channels[selectedChannel_];
-    std::vector<float> signal(static_cast<std::size_t>(length));
+    const int displayChannel = group.displayChannels[group.selectedRow];
+    const spikeviewer::ChannelInfo& channel = recording_->channels[displayChannel];
+    const QVector<float> signalVector = spikeviewer::extractChannelWindow(
+        *recording_, channel, start, end, currentTransformMode());
+    std::vector<float> signal(signalVector.begin(), signalVector.end());
+    if (signal.empty()) {
+        group.statsLabel->setText(QStringLiteral("Select a channel"));
+        return;
+    }
+
+    const bool digitalChannel = spikeviewer::isDigitalChannel(channel);
+
     float minValue = std::numeric_limits<float>::infinity();
     float maxValue = -std::numeric_limits<float>::infinity();
     double sumSq = 0.0;
     double sumAbs = 0.0;
-    for (int offset = 0; offset < length; ++offset) {
-        const float value = recording_->amplifier->sampleUv(start + offset, channel.index);
-        signal[static_cast<std::size_t>(offset)] = value;
+    for (float value : signal) {
         minValue = std::min(minValue, value);
         maxValue = std::max(maxValue, value);
         sumSq += value * value;
         sumAbs += std::abs(value);
     }
 
-    const float rms = static_cast<float>(std::sqrt(sumSq / length));
-    const float meanAbs = static_cast<float>(sumAbs / length);
+    const float rms = static_cast<float>(std::sqrt(sumSq / signal.size()));
+    const float meanAbs = static_cast<float>(sumAbs / signal.size());
     const float ptp = maxValue - minValue;
 
-    std::vector<float> windowPtps(static_cast<std::size_t>(recording_->channelCount));
-    for (int physicalChannel = 0; physicalChannel < recording_->channelCount; ++physicalChannel) {
-        float minChannel = std::numeric_limits<float>::infinity();
-        float maxChannel = -std::numeric_limits<float>::infinity();
-        for (int sampleIndex = start; sampleIndex < end; ++sampleIndex) {
-            const float value = recording_->amplifier->sampleUv(sampleIndex, physicalChannel);
-            minChannel = std::min(minChannel, value);
-            maxChannel = std::max(maxChannel, value);
+    std::vector<float> windowPtps(static_cast<std::size_t>(group.displayChannels.size()));
+    for (int row = 0; row < group.displayChannels.size(); ++row) {
+        const spikeviewer::ChannelInfo& groupChannel = recording_->channels[group.displayChannels[row]];
+        const QVector<float> groupSignal = spikeviewer::extractChannelWindow(
+            *recording_, groupChannel, start, end, currentTransformMode());
+        if (groupSignal.isEmpty()) {
+            windowPtps[static_cast<std::size_t>(row)] = 0.0f;
+            continue;
         }
-        windowPtps[static_cast<std::size_t>(physicalChannel)] = maxChannel - minChannel;
+        const auto minMax = std::minmax_element(groupSignal.begin(), groupSignal.end());
+        windowPtps[static_cast<std::size_t>(row)] = *minMax.second - *minMax.first;
     }
-    std::vector<int> order(recording_->channelCount);
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](int left, int right) {
+
+    std::vector<int> rankOrder(group.displayChannels.size());
+    std::iota(rankOrder.begin(), rankOrder.end(), 0);
+    std::sort(rankOrder.begin(), rankOrder.end(), [&](int left, int right) {
         return windowPtps[static_cast<std::size_t>(left)] > windowPtps[static_cast<std::size_t>(right)];
     });
-    const auto position = std::find(order.begin(), order.end(), channel.index);
-    const int rank = position != order.end() ? static_cast<int>(std::distance(order.begin(), position)) + 1 : recording_->channelCount;
+    const auto position = std::find(rankOrder.begin(), rankOrder.end(), group.selectedRow);
+    const int rank = position != rankOrder.end() ? static_cast<int>(std::distance(rankOrder.begin(), position)) + 1 : group.displayChannels.size();
 
     QString thresholdText = QStringLiteral("n/a");
     QString eventCountText = QStringLiteral("n/a");
-    if (heatmap_ && channel.index < heatmap_->eventThresholds.size()) {
+    if (digitalChannel) {
+        int risingEdges = 0;
+        float previous = signal.front();
+        for (std::size_t index = 1; index < signal.size(); ++index) {
+            if (signal[index] > 0.5f && previous <= 0.5f) {
+                ++risingEdges;
+            }
+            previous = signal[index];
+        }
+        thresholdText = QStringLiteral("rising @ 0.5");
+        eventCountText = QString::number(risingEdges);
+    } else if (group.heatmap && group.selectedRow < group.heatmap->eventThresholds.size()) {
         const float median = medianCopy(signal);
-        float previous = signal.front() - median;
+        const float threshold = group.heatmap->eventThresholds[group.selectedRow];
         int crossings = 0;
-        for (std::size_t i = 1; i < signal.size(); ++i) {
-            const float centered = signal[i] - median;
-            const float threshold = heatmap_->eventThresholds[channel.index];
+        float previous = signal.front() - median;
+        for (std::size_t index = 1; index < signal.size(); ++index) {
+            const float centered = signal[index] - median;
             if (centered < threshold && previous >= threshold) {
                 ++crossings;
             }
             previous = centered;
         }
-        thresholdText = QStringLiteral("%1 uV").arg(heatmap_->eventThresholds[channel.index], 0, 'f', 1);
+        thresholdText = QStringLiteral("%1 uV").arg(threshold, 0, 'f', 1);
         eventCountText = QString::number(crossings);
     }
 
-    const QColor color = channelColor(selectedChannel_, recording_->channelCount);
-    statsLabel_->setStyleSheet(QStringLiteral("color: %1;").arg(color.name()));
-    statsLabel_->setText(
+    const QString transformText = digitalChannel
+        ? QStringLiteral("TTL raw (filters bypassed)")
+        : spikeviewer::transformModeName(currentTransformMode());
+    const QString units = digitalChannel ? QStringLiteral("TTL") : QStringLiteral("uV");
+    const QString meanLabel = digitalChannel ? QStringLiteral("Mean High") : QStringLiteral("Mean |V|");
+
+    const QColor color = channelColor(group.selectedRow, std::max(group.displayChannels.size(), 1));
+    group.statsLabel->setStyleSheet(QStringLiteral("color: %1;").arg(color.name()));
+    group.statsLabel->setText(
         QStringLiteral(
             "%1\n"
             "Electrode %2\n"
             "(%3, %4)\n"
             "\n"
-            "Window %5s\n"
-            "to %6s\n"
+            "Transform %5\n"
+            "Window %6s\n"
+            "to %7s\n"
             "\n"
-            "Min %7 uV\n"
-            "Max %8 uV\n"
-            "P2P %9 uV\n"
-            "RMS %10 uV\n"
-            "Mean |V| %11 uV\n"
-            "Threshold %12\n"
-            "Events %13\n"
+            "Min %8 %9\n"
+            "Max %10 %11\n"
+            "P2P %12 %13\n"
+            "RMS %14 %15\n"
+            "%16 %17 %18\n"
+            "Stack scale x%19\n"
+            "Detail scale x%20\n"
+            "Threshold %21\n"
+            "Events %22\n"
             "\n"
-            "Activity rank %14/%15\n"
-            "Display scale x%16"
+            "Activity rank %23/%24"
         )
             .arg(channel.label)
             .arg(channel.electrodeId)
             .arg(channel.x, 0, 'g', 6)
             .arg(channel.y, 0, 'g', 6)
+            .arg(transformText)
             .arg(startTime, 0, 'f', 4)
             .arg(startTime + windowSpin_->value(), 0, 'f', 4)
-            .arg(minValue, 0, 'f', 1)
-            .arg(maxValue, 0, 'f', 1)
-            .arg(ptp, 0, 'f', 1)
-            .arg(rms, 0, 'f', 1)
-            .arg(meanAbs, 0, 'f', 1)
+            .arg(minValue, 0, 'f', digitalChannel ? 3 : 1)
+            .arg(units)
+            .arg(maxValue, 0, 'f', digitalChannel ? 3 : 1)
+            .arg(units)
+            .arg(ptp, 0, 'f', digitalChannel ? 3 : 1)
+            .arg(units)
+            .arg(rms, 0, 'f', digitalChannel ? 3 : 1)
+            .arg(units)
+            .arg(meanLabel)
+            .arg(meanAbs, 0, 'f', digitalChannel ? 3 : 1)
+            .arg(units)
+            .arg(scaleSpin_->value(), 0, 'f', 2)
+            .arg(detailScaleSpin_->value(), 0, 'f', 2)
             .arg(thresholdText)
             .arg(eventCountText)
             .arg(rank)
-            .arg(recording_->channelCount)
-            .arg(scaleSpin_->value(), 0, 'f', 2)
+            .arg(group.displayChannels.size())
     );
 }
 
-void MainWindow::startHeatmapWorker() {
-    if (!recording_) {
+void MainWindow::startHeatmapWorker(int groupIndex) {
+    if (!recording_ || groupIndex < 0 || groupIndex >= groups_.size()) {
         return;
     }
 
-    const quint64 generation = heatmapGeneration_;
+    ChannelGroupUi& group = groups_[groupIndex];
+    group.heatmap.reset();
+    const quint64 generation = ++group.heatmapGeneration;
+    const std::shared_ptr<spikeviewer::RecordingData> recording = recording_;
+    const QVector<int> displayChannels = group.displayChannels;
+    const spikeviewer::TransformMode transformMode = currentTransformMode();
+
+    if (displayChannels.isEmpty()) {
+        refreshViews();
+        return;
+    }
+
     auto* watcher = new QFutureWatcher<spikeviewer::HeatmapResult>(this);
-    connect(watcher, &QFutureWatcher<spikeviewer::HeatmapResult>::finished, this, [this, watcher, generation]() {
+    connect(watcher, &QFutureWatcher<spikeviewer::HeatmapResult>::finished, this, [this, watcher, groupIndex, generation]() {
         const spikeviewer::HeatmapResult result = watcher->result();
         watcher->deleteLater();
-        if (generation != heatmapGeneration_) {
+        if (groupIndex < 0 || groupIndex >= groups_.size()) {
             return;
         }
-        heatmap_ = std::make_shared<spikeviewer::HeatmapResult>(result);
-        overviewView_->setHeatmap(heatmap_);
+        ChannelGroupUi& group = groups_[groupIndex];
+        if (generation != group.heatmapGeneration) {
+            return;
+        }
+        group.heatmap = std::make_shared<spikeviewer::HeatmapResult>(result);
         refreshViews();
     });
 
-    const std::shared_ptr<spikeviewer::RecordingData> recording = recording_;
-    watcher->setFuture(QtConcurrent::run([recording]() {
-        return spikeviewer::computeHeatmap(*recording);
+    watcher->setFuture(QtConcurrent::run([recording, displayChannels, transformMode]() {
+        return spikeviewer::computeHeatmap(*recording, displayChannels, transformMode);
     }));
 }

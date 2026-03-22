@@ -16,6 +16,11 @@ struct ChannelInfo {
     int electrodeId = 0;
     float x = 0.0f;
     float y = 0.0f;
+    enum class SourceKind {
+        Amplifier,
+        DigitalBit,
+    };
+    SourceKind sourceKind = SourceKind::Amplifier;
 };
 
 class MappedInt16Matrix {
@@ -41,10 +46,31 @@ private:
     int sampleCount_ = 0;
 };
 
+class MappedUInt16Vector {
+public:
+    MappedUInt16Vector() = default;
+    ~MappedUInt16Vector();
+
+    MappedUInt16Vector(const MappedUInt16Vector&) = delete;
+    MappedUInt16Vector& operator=(const MappedUInt16Vector&) = delete;
+
+    bool open(const QString& path, QString* error);
+    bool isOpen() const;
+    int sampleCount() const;
+    quint16 sampleValue(int sampleIndex) const;
+
+private:
+    QFile file_;
+    uchar* mapped_ = nullptr;
+    qint64 byteCount_ = 0;
+    int sampleCount_ = 0;
+};
+
 struct RecordingData {
     QString baseDir;
     QString infoPath;
     QString amplifierPath;
+    QString digitalInPath;
     QString timePath;
     double sampleRate = 0.0;
     int sampleCount = 0;
@@ -52,6 +78,7 @@ struct RecordingData {
     int channelCount = 0;
     QVector<ChannelInfo> channels;
     std::shared_ptr<MappedInt16Matrix> amplifier;
+    std::shared_ptr<MappedUInt16Vector> digitalIn;
 };
 
 enum class OverviewMode {
@@ -61,6 +88,15 @@ enum class OverviewMode {
     PeakToPeak,
     Population,
     Motion,
+};
+
+enum class TransformMode {
+    Raw,
+    Highpass300,
+    Bandpass300To6000,
+    Bandpass500To3000,
+    Lowpass250,
+    Notch60,
 };
 
 struct HeatmapResult {
@@ -82,8 +118,25 @@ struct HeatmapResult {
 };
 
 std::shared_ptr<RecordingData> loadRecording(const QString& infoPath, QString* error);
-QVector<float> estimateEventThresholds(const RecordingData& recording, int windowSamples = 6000, int sampleWindows = 10);
-HeatmapResult computeHeatmap(const RecordingData& recording);
+bool isDigitalChannel(const ChannelInfo& channel);
+QVector<float> extractChannelWindow(
+    const RecordingData& recording,
+    const ChannelInfo& channel,
+    int startSample,
+    int endSample,
+    TransformMode transformMode,
+    int paddingSamples = -1);
+QVector<float> estimateEventThresholds(
+    const RecordingData& recording,
+    const QVector<int>& displayChannelIndices,
+    TransformMode transformMode,
+    int windowSamples = 6000,
+    int sampleWindows = 10);
+HeatmapResult computeHeatmap(
+    const RecordingData& recording,
+    const QVector<int>& displayChannelIndices,
+    TransformMode transformMode);
 QString overviewModeName(OverviewMode mode);
+QString transformModeName(TransformMode mode);
 
 }  // namespace spikeviewer

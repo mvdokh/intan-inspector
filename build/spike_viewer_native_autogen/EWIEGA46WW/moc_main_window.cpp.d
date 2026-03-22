@@ -700,7 +700,6 @@
   /Users/martindokholyan/Desktop/spike-sort/intan-inspector/recording.h \
   /Users/martindokholyan/Desktop/spike-sort/intan-inspector/widgets.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/QFile \
-  /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/QPointer \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/QString \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/QVector \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qalgorithms.h \
@@ -738,7 +737,6 @@
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qobjectdefs_impl.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qpair.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qpoint.h \
-  /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qpointer.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qprocessordetection.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qrect.h \
   /opt/homebrew/Cellar/qt@5/5.15.17_1/lib/QtCore.framework/Versions/5/Headers/qrefcount.h \

@@ -811,7 +811,6 @@ CMakeFiles/spike_viewer_native.dir/main.cpp.o: /Users/martindokholyan/Desktop/sp
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDir \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFile \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFileInfo \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QVector \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qalgorithms.h \
@@ -858,7 +857,6 @@ CMakeFiles/spike_viewer_native.dir/main.cpp.o: /Users/martindokholyan/Desktop/sp
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs_impl.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpair.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpoint.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qprocessordetection.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrect.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrefcount.h \
@@ -1808,10 +1806,15 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: /Users/martindokholyan/Des
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDeadlineTimer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDir \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFile \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFileInfo \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFutureWatcher \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QList \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRect \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRegularExpression \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSignalBlocker \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSize \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSizeF \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QStringList \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QVector \
@@ -2009,15 +2012,21 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: /Users/martindokholyan/Des
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qwaitcondition.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qwineventnotifier.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qxmlstream.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QCursor \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QGuiApplication \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QImage \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QScreen \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QTransform \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qbrush.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcolor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qcursor.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfont.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfontinfo.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qfontmetrics.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qimage.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qkeysequence.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qmatrix.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpaintdevice.h \
@@ -2028,6 +2037,7 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: /Users/martindokholyan/Des
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qregion.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qrgb.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qrgba64.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qscreen.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtgui-config.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtguiglobal.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qtransform.h \
@@ -2043,8 +2053,10 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: /Users/martindokholyan/Des
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMainWindow \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QMessageBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSplitter \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QWidget \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractbutton.h \
@@ -2068,6 +2080,7 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: /Users/martindokholyan/Des
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmessagebox.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsizepolicy.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qslider.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qspinbox.h \
@@ -3782,7 +3795,6 @@ CMakeFiles/spike_viewer_native.dir/spike_viewer_native_autogen/mocs_compilation.
   spike_viewer_native_autogen/EWIEGA46WW/moc_main_window.cpp \
   spike_viewer_native_autogen/EWIEGA46WW/moc_widgets.cpp \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFile \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QString \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QVector \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qalgorithms.h \
@@ -3822,7 +3834,6 @@ CMakeFiles/spike_viewer_native.dir/spike_viewer_native_autogen/mocs_compilation.
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qobjectdefs_impl.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpair.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpoint.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qprocessordetection.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrect.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrefcount.h \
@@ -4810,11 +4821,11 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qstyle.h:
 
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h:
+
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlistview.h:
-
-/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayoutitem.h:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qfiledialog.h:
 
@@ -4828,6 +4839,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout:
 
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget:
+
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSplitter:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton:
@@ -4839,6 +4852,14 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QHBoxLayout:
 
 /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFileDialog:
+
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qscreen.h:
+
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QTransform:
+
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayoutitem.h:
+
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QCursor:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qxmlstream.h:
 
@@ -4884,6 +4905,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qscopeguard.h:
 
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea:
+
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsavefile.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qrunnable.h:
@@ -4897,6 +4920,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpropertyanimation.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qprocess.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpluginloader.h:
 
@@ -4942,14 +4967,6 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdebug.h:
 
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRegularExpression:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstringbuilder.h:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qhistorystate.h:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdeadlinetimer.h:
-
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QJsonDocument:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdatetime.h:
@@ -4978,10 +4995,6 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcborstream.h:
 
-/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdialog.h:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcbormap.h:
-
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcborcommon.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcache.h:
@@ -5008,7 +5021,23 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QtCore:
 
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSizeF:
+
+/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdialog.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcbormap.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSize:
+
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSignalBlocker:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qstringbuilder.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qhistorystate.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdeadlinetimer.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRegularExpression:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject:
 
@@ -5019,6 +5048,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers/qtconcurrentrun.h:
 
 /opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers/qtconcurrentreducekernel.h:
+
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QGuiApplication:
 
 /opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers/qtconcurrentmap.h:
 
@@ -5158,6 +5189,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 
 /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qpixmap.h:
 
+/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QScreen:
+
 /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qmatrix.h:
 
 /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h:
@@ -5199,8 +5232,6 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qsharedpointer.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qshareddata.h:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpoint.h:
 
@@ -5257,8 +5288,6 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpair.h:
 
 /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qatomic_cxx11.h:
-
-/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer:
 
 /Users/martindokholyan/Desktop/spike-sort/intan-inspector/widgets.h:
 
@@ -5837,6 +5866,8 @@ spike_viewer_native_autogen/mocs_compilation.cpp:
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_always_bitcastable.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_allocator.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QList:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/invoke.h:
 
@@ -7051,6 +7082,8 @@ spike_viewer_native_autogen/EWIEGA46WW/moc_widgets.cpp:
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/alloca.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/maybe_const.h:
+
+/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRect:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/advance.h:
 

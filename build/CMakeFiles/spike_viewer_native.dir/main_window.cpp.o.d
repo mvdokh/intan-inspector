@@ -899,8 +899,6 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmainwindow.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QComboBox \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qcombobox.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractitemdelegate.h \
@@ -918,6 +916,7 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qrubberband.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qframe.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractitemmodel.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QCursor \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QDir \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdir.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfileinfo.h \
@@ -927,6 +926,7 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qfiledialog.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qurl.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qdialog.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFileInfo \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QFrame \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QFutureWatcher \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfuturewatcher.h \
@@ -939,6 +939,12 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qtextstream.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qset.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcontiguouscache.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QGuiApplication \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qguiapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qinputmethod.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QHBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qboxlayout.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qlayout.h \
@@ -957,10 +963,22 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QPushButton \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qpushbutton.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qabstractbutton.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRegularExpression \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QScrollArea \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qscrollarea.h \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QScreen \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qscreen.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QList \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QRect \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSize \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSizeF \
+  /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/QTransform \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QSignalBlocker \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSlider \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QSplitter \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qsplitter.h \
+  /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QTabWidget \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QVBoxLayout \
   /opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers/QtConcurrent \
   /opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers/QtConcurrentDepends \
@@ -968,7 +986,6 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QtCoreDepends \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractanimation.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstracteventdispatcher.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventloop.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractnativeeventfilter.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractproxymodel.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qabstractstate.h \
@@ -995,8 +1012,6 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcollator.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcommandlineoption.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcommandlineparser.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreevent.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qconcatenatetablesproxymodel.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcryptographichash.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qdeadlinetimer.h \
@@ -1007,7 +1022,6 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qeventtransition.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfactoryinterface.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfileselector.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QStringList \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfilesystemwatcher.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qfinalstate.h \
@@ -1036,6 +1050,7 @@ CMakeFiles/spike_viewer_native.dir/main_window.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qparallelanimationgroup.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpauseanimation.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qplugin.h \
+  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpluginloader.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qprocess.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpropertyanimation.h \

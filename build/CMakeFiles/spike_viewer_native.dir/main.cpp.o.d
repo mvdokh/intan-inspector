@@ -899,8 +899,6 @@ CMakeFiles/spike_viewer_native.dir/main.cpp.o: \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qmainwindow.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qtabwidget.h \
   /opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers/qicon.h \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/QPointer \
-  /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qpointer.h \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/QApplication \
   /opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers/qapplication.h \
   /opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers/qcoreapplication.h \

@@ -43,4 +43,16 @@ Optional: pass an `info.rhd` path directly.
   - detail trace view
   - overview modes: `Activity`, `Events`, `RMS`, `Peak-to-Peak`, `Population`, `Motion`
   - click the overview to jump in time
+- The channel browser is split into two tabs:
+  - `Main Channels` for the A-series electrophysiology channels (for example `A-000` through `A-031`)
+  - `Aux / Digital` for AUX, DIGITAL IN, and other non-primary channels
+  - `digitalin.dat` channels are loaded as real TTL bit signals rather than reusing amplifier traces
+- The transform selector supports common electrophysiology display filters:
+  - `Raw`
+  - `High-pass 300 Hz`
+  - `Band-pass 300-6000 Hz`
+  - `Band-pass 500-3000 Hz`
+  - `Low-pass 250 Hz`
+  - `Notch 60 Hz`
+- Digital channels bypass analog filters and the detail pane has its own `Detail Scale` control.
 - The implementation uses memory-mapped `amplifier.dat` access and a background worker for the overview analysis so large recordings stay responsive.

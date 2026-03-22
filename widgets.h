@@ -13,18 +13,22 @@ public:
     explicit AllChannelsView(QWidget* parent = nullptr);
 
     void setRecording(const std::shared_ptr<spikeviewer::RecordingData>& recording);
+    void setDisplayChannels(const QVector<int>& displayChannels);
     void setSelectedChannel(int selectedChannel);
     void setViewState(double startTime, double windowSeconds, double voltageScale);
+    void setTransformMode(spikeviewer::TransformMode transformMode);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
     std::shared_ptr<spikeviewer::RecordingData> recording_;
+    QVector<int> displayChannels_;
     int selectedChannel_ = -1;
     double startTime_ = 0.0;
     double windowSeconds_ = 0.02;
     double voltageScale_ = 1.0;
+    spikeviewer::TransformMode transformMode_ = spikeviewer::TransformMode::Raw;
 };
 
 class DetailTraceView : public QWidget {
@@ -34,18 +38,22 @@ public:
     explicit DetailTraceView(QWidget* parent = nullptr);
 
     void setRecording(const std::shared_ptr<spikeviewer::RecordingData>& recording);
+    void setDisplayChannels(const QVector<int>& displayChannels);
     void setSelectedChannel(int selectedChannel);
     void setViewState(double startTime, double windowSeconds, double voltageScale);
+    void setTransformMode(spikeviewer::TransformMode transformMode);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
     std::shared_ptr<spikeviewer::RecordingData> recording_;
+    QVector<int> displayChannels_;
     int selectedChannel_ = -1;
     double startTime_ = 0.0;
     double windowSeconds_ = 0.02;
     double voltageScale_ = 1.0;
+    spikeviewer::TransformMode transformMode_ = spikeviewer::TransformMode::Raw;
 };
 
 class OverviewView : public QWidget {
