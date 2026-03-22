@@ -1,0 +1,5 @@
+/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/spike_viewer_native.dir
+/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/edit_cache.dir
+/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/rebuild_cache.dir
+/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/spike_viewer_native_autogen_timestamp_deps.dir
+/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/spike_viewer_native_autogen.dir

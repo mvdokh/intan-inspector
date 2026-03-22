@@ -1,0 +1,194 @@
+{
+	"BUILD_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen",
+	"CMAKE_BINARY_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build",
+	"CMAKE_CURRENT_BINARY_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector",
+	"CMAKE_EXECUTABLE" : "/opt/homebrew/bin/cmake",
+	"CMAKE_LIST_FILES" : 
+	[
+		"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/CMakeLists.txt",
+		"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/4.2.0/CMakeSystem.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Darwin-Initialize.cmake",
+		"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/4.2.0/CMakeCXXCompiler.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Darwin.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/UnixPaths.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeCXXInformation.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake",
+		"/opt/homebrew/share/cmake/Modules/Compiler/AppleClang-CXX.cmake",
+		"/opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake",
+		"/opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake",
+		"/opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake",
+		"/opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Apple-AppleClang-CXX.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Apple-Clang-CXX.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Apple-Clang.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake",
+		"/opt/homebrew/share/cmake/Modules/Internal/CMakeCXXLinkerInformation.cmake",
+		"/opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake",
+		"/opt/homebrew/share/cmake/Modules/Linker/AppleClang-CXX.cmake",
+		"/opt/homebrew/share/cmake/Modules/Linker/AppleClang.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Linker/Apple-AppleClang-CXX.cmake",
+		"/opt/homebrew/share/cmake/Modules/Platform/Linker/Apple-AppleClang.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5/Qt5ConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5/Qt5Config.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5/Qt5ModuleLocation.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Core/Qt5CoreConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Core/Qt5CoreConfig.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Core/Qt5CoreConfigExtras.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Core/Qt5CoreConfigExtrasMkspecDir.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Core/Qt5CoreMacros.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeParseArguments.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5GuiConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5GuiConfig.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QCocoaIntegrationPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QGifPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QICNSPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QICOPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QJpegPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QMacHeifPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QMacJp2Plugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QMinimalIntegrationPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QOffscreenIntegrationPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QPdfPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QSvgIconPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QSvgPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QTgaPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QTiffPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QTuioTouchPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QVirtualKeyboardPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QWbmpPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QWebGLIntegrationPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QWebpPlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5Gui_QXdgDesktopPortalThemePlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Gui/Qt5GuiConfigExtras.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Widgets/Qt5WidgetsConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Widgets/Qt5WidgetsConfig.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Widgets/Qt5Widgets_QMacStylePlugin.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Widgets/Qt5WidgetsConfigExtras.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Widgets/Qt5WidgetsMacros.cmake",
+		"/opt/homebrew/share/cmake/Modules/CMakeParseArguments.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Concurrent/Qt5ConcurrentConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Concurrent/Qt5ConcurrentConfig.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Xml/Qt5XmlConfigVersion.cmake",
+		"/opt/homebrew/opt/qt@5/lib/cmake/Qt5Xml/Qt5XmlConfig.cmake"
+	],
+	"CMAKE_SOURCE_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector",
+	"CROSS_CONFIG" : false,
+	"DEP_FILE" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "spike_viewer_native_autogen/timestamp",
+	"HEADERS" : 
+	[
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/main_window.h",
+			"MU",
+			"EWIEGA46WW/moc_main_window.cpp",
+			null
+		],
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/recording.h",
+			"MU",
+			"EWIEGA46WW/moc_recording.cpp",
+			null
+		],
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/widgets.h",
+			"MU",
+			"EWIEGA46WW/moc_widgets.cpp",
+			null
+		]
+	],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen/include",
+	"MOC_COMPILATION_FILE" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : 
+	[
+		"QT_CONCURRENT_LIB",
+		"QT_CORE_LIB",
+		"QT_GUI_LIB",
+		"QT_NO_DEBUG",
+		"QT_WIDGETS_LIB",
+		"QT_XML_LIB"
+	],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/opt/homebrew/opt/qt@5/lib/QtCore.framework",
+		"/opt/homebrew/opt/qt@5/lib/QtCore.framework/Headers",
+		"/opt/homebrew/opt/qt@5/mkspecs/macx-clang",
+		"/opt/homebrew/opt/qt@5/lib/QtGui.framework",
+		"/opt/homebrew/opt/qt@5/lib/QtGui.framework/Headers",
+		"/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers",
+		"/opt/homebrew/opt/qt@5/lib/QtWidgets.framework",
+		"/opt/homebrew/opt/qt@5/lib/QtWidgets.framework/Headers",
+		"/opt/homebrew/opt/qt@5/lib/QtConcurrent.framework",
+		"/opt/homebrew/opt/qt@5/lib/QtConcurrent.framework/Headers",
+		"/opt/homebrew/opt/qt@5/lib/QtXml.framework",
+		"/opt/homebrew/opt/qt@5/lib/QtXml.framework/Headers",
+		"/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1",
+		"/Library/Developer/CommandLineTools/usr/lib/clang/17/include",
+		"/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
+		"/Library/Developer/CommandLineTools/usr/include"
+	],
+	"MOC_MACRO_NAMES" : [ "Q_OBJECT", "Q_GADGET", "Q_NAMESPACE", "Q_NAMESPACE_EXPORT" ],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/c++",
+		"-std=c++17",
+		"-w",
+		"-dM",
+		"-E",
+		"/opt/homebrew/share/cmake/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/spike_viewer_native_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : [],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 10,
+	"PARSE_CACHE_FILE" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/spike_viewer_native_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/opt/homebrew/opt/qt@5/bin/moc",
+	"QT_UIC_EXECUTABLE" : "/opt/homebrew/opt/qt@5/bin/uic",
+	"QT_VERSION_MAJOR" : 5,
+	"QT_VERSION_MINOR" : 15,
+	"SETTINGS_FILE" : "/Users/martindokholyan/Desktop/spike-sort/intan-inspector/build/CMakeFiles/spike_viewer_native_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/main.cpp",
+			"MU",
+			null
+		],
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/main_window.cpp",
+			"MU",
+			null
+		],
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/recording.cpp",
+			"MU",
+			null
+		],
+		[
+			"/Users/martindokholyan/Desktop/spike-sort/intan-inspector/widgets.cpp",
+			"MU",
+			null
+		]
+	],
+	"UIC_OPTIONS" : [],
+	"UIC_SEARCH_PATHS" : [],
+	"UIC_SKIP" : [],
+	"UIC_UI_FILES" : [],
+	"USE_BETTER_GRAPH" : false,
+	"VERBOSITY" : 0
+}
