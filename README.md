@@ -1,6 +1,8 @@
 # Native Spike Viewer Build
 
-The original Python `spike_viewer.py` is still untouched. The native rewrite is the `spike_viewer_native` C++ executable built with Qt Widgets and CMake.
+![UI](1.jpg)
+
+`spike_viewer_native` C++ executable built with Qt Widgets and CMake.
 
 ## Requirements
 
